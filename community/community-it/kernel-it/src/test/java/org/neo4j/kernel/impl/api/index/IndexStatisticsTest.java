@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -136,6 +136,7 @@ public class IndexStatisticsTest
         int batchSize = random.nextInt( 1, 5 );
         FeatureToggles.set( MultipleIndexPopulator.class, MultipleIndexPopulator.QUEUE_THRESHOLD_NAME, batchSize );
         FeatureToggles.set( BatchingMultipleIndexPopulator.class, MultipleIndexPopulator.QUEUE_THRESHOLD_NAME, batchSize );
+        FeatureToggles.set( MultipleIndexPopulator.class, "print_debug", true );
 
         GraphDatabaseAPI graphDatabaseAPI = dbRule.getGraphDatabaseAPI();
         this.db = graphDatabaseAPI;
@@ -151,6 +152,7 @@ public class IndexStatisticsTest
     {
         FeatureToggles.clear( MultipleIndexPopulator.class, MultipleIndexPopulator.QUEUE_THRESHOLD_NAME );
         FeatureToggles.clear( BatchingMultipleIndexPopulator.class, MultipleIndexPopulator.QUEUE_THRESHOLD_NAME );
+        FeatureToggles.clear( MultipleIndexPopulator.class, "print_debug" );
     }
 
     @Test
@@ -422,7 +424,7 @@ public class IndexStatisticsTest
                     }
                     if ( !found )
                     {
-                        mismatches.add( "Index is missing entry for " + name );
+                        mismatches.add( "Index is missing entry for " + name + " " + node );
                     }
                 }
                 if ( !mismatches.isEmpty() )

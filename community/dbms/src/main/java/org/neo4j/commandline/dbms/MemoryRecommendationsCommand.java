@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.commandline.dbms;
 
 import java.io.File;
+import java.io.FileFilter;
 import java.io.FilenameFilter;
 import java.nio.file.Path;
 import java.util.Locale;
@@ -31,13 +32,13 @@ import org.neo4j.commandline.admin.IncorrectUsage;
 import org.neo4j.commandline.admin.OutsideWorld;
 import org.neo4j.commandline.arguments.Arguments;
 import org.neo4j.commandline.arguments.OptionalNamedArg;
-import org.neo4j.graphdb.config.InvalidSettingException;
 import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.layout.DatabaseLayout;
 import org.neo4j.io.os.OsBeanUtil;
 import org.neo4j.kernel.api.impl.index.storage.FailureStorage;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.store.StoreType;
+import org.neo4j.kernel.internal.NativeIndexFileFilter;
 
 import static java.lang.String.format;
 import static org.neo4j.commandline.arguments.common.Database.ARG_DATABASE;
@@ -62,8 +63,8 @@ public class MemoryRecommendationsCommand implements AdminCommand
     // And the page cache gets what's left, though always at least 100 MiB.
     // Heap never goes beyond 31 GiBs.
     private static final Bracket[] datapoints = {
-            new Bracket( 0.01, 0.005, 0.005 ),
-            new Bracket( 1.0, 0.5, 0.5 ),
+            new Bracket( 0.01, 0.007, 0.002 ),
+            new Bracket( 1.0, 0.65, 0.3 ),
             new Bracket( 2.0, 1, 0.5 ),
             new Bracket( 4.0, 1.5, 2 ),
             new Bracket( 6.0, 2, 3 ),
@@ -101,7 +102,7 @@ public class MemoryRecommendationsCommand implements AdminCommand
         long osMemory = recommendOsMemory( totalMemoryBytes );
         long heapMemory = recommendHeapMemory( totalMemoryBytes );
         long recommendation = totalMemoryBytes - osMemory - heapMemory;
-        recommendation = Math.max( mebiBytes( 100 ), recommendation );
+        recommendation = Math.max( mebiBytes( 8 ), recommendation );
         recommendation = Math.min( tebiBytes( 16 ), recommendation );
         return recommendation;
     }
@@ -147,7 +148,8 @@ public class MemoryRecommendationsCommand implements AdminCommand
         double gibi1 = ONE_GIBI_BYTE;
         double mebi1 = ONE_MEBI_BYTE;
         double mebi100 = 100 * mebi1;
-        long kibi100 = 100 * ONE_KIBI_BYTE;
+        double kibi1 = ONE_KIBI_BYTE;
+        double kibi100 = 100 * kibi1;
         if ( bytes >= gibi1 )
         {
             double gibibytes = bytes / gibi1;
@@ -176,7 +178,9 @@ public class MemoryRecommendationsCommand implements AdminCommand
         }
         else
         {
-            return String.valueOf( bytes );
+            // For kilobytes there's no need to bother with decimals, just print a rough figure rounded upwards
+            double kibiBytes = bytes / kibi1;
+            return format( Locale.ROOT, "%dk", (long) Math.ceil( kibiBytes ) );
         }
     }
 
@@ -245,17 +249,18 @@ public class MemoryRecommendationsCommand implements AdminCommand
 
     private long dbSpecificPageCacheSize( DatabaseLayout databaseLayout )
     {
-        return sumStoreFiles( databaseLayout ) +
-                sumIndexFiles( baseSchemaIndexFolder( databaseLayout.databaseDirectory() ), getNativeIndexFileFilter( false ) );
+        return sumStoreFiles( databaseLayout ) + sumIndexFiles( baseSchemaIndexFolder( databaseLayout.databaseDirectory() ),
+                getNativeIndexFileFilter( databaseLayout.databaseDirectory(), false ) );
     }
 
     private long dbSpecificLuceneSize( File databaseDirectory )
     {
-        return sumIndexFiles( baseSchemaIndexFolder( databaseDirectory ), getNativeIndexFileFilter( true ) );
+        return sumIndexFiles( baseSchemaIndexFolder( databaseDirectory ), getNativeIndexFileFilter( databaseDirectory, true ) );
     }
 
-    private FilenameFilter getNativeIndexFileFilter( boolean inverse )
+    private FilenameFilter getNativeIndexFileFilter( File storeDir, boolean inverse )
     {
+        FileFilter nativeIndexFilter = new NativeIndexFileFilter( storeDir );
         return ( dir, name ) ->
         {
             File file = new File( dir, name );
@@ -270,22 +275,14 @@ public class MemoryRecommendationsCommand implements AdminCommand
                 return false;
             }
 
-            Path path = file.toPath();
-            int nameCount = path.getNameCount();
-            // Lucene index files lives in:
-            // - schema/index/lucene_native-x.y/<indexId>/lucene-x.y/x/.....
-            boolean isLuceneFilePart1 = nameCount >= 3 && path.getName( nameCount - 3 ).toString().startsWith( "lucene-" );
-            // - schema/index/lucene/<indexId>/<partition>/.....
-            boolean isLuceneFilePart2 = nameCount >= 4 && path.getName( nameCount - 4 ).toString().equals( "lucene" );
-
-            boolean isLuceneFile = isLuceneFilePart1 || isLuceneFilePart2;
-            return inverse == isLuceneFile;
+            return inverse != nativeIndexFilter.accept( file );
         };
     }
 
     private long sumStoreFiles( DatabaseLayout databaseLayout )
     {
         long total = 0;
+        // Include store files
         for ( StoreType type : StoreType.values() )
         {
             if ( type.isRecordStore() )
@@ -294,7 +291,15 @@ public class MemoryRecommendationsCommand implements AdminCommand
                 total += databaseLayout.file( type.getDatabaseFile() ).filter( fileSystem::fileExists ).mapToLong( fileSystem::getFileSize ).sum();
             }
         }
+        // Include label index
+        total += sizeOfFileIfExists( databaseLayout.labelScanStore() );
         return total;
+    }
+
+    private long sizeOfFileIfExists( File file )
+    {
+        FileSystemAbstraction fileSystem = outsideWorld.fileSystem();
+        return fileSystem.fileExists( file ) ? fileSystem.getFileSize( file ) : 0;
     }
 
     private long sumIndexFiles( File file, FilenameFilter filter )

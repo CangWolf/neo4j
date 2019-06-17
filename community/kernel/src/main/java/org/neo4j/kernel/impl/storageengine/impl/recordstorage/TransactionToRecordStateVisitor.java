@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -23,6 +23,7 @@ import org.eclipse.collections.api.IntIterable;
 import org.eclipse.collections.api.set.primitive.LongSet;
 
 import java.util.Iterator;
+import java.util.Optional;
 
 import org.neo4j.internal.kernel.api.exceptions.schema.CreateConstraintFailureException;
 import org.neo4j.internal.kernel.api.schema.constraints.ConstraintDescriptor;
@@ -167,7 +168,25 @@ class TransactionToRecordStateVisitor extends TxStateVisitor.Adapter
     @Override
     public void visitRemovedIndex( IndexDescriptor index )
     {
-        StoreIndexDescriptor rule = schemaStorage.indexGetForSchema( index );
+        StoreIndexDescriptor rule;
+        Optional<String> name = index.getUserSuppliedName();
+        if ( name.isPresent() )
+        {
+            String indexName = name.get();
+            rule = schemaStorage.indexGetForName( indexName );
+        }
+        else
+        {
+            rule = schemaStorage.indexGetForSchema( index, true );
+            if ( rule == null )
+            {
+                // Loosen the filtering a bit. The reason we do this during drop is this scenario where a uniqueness constraint creation
+                // crashed or similar, where the UNIQUE index exists, but not its constraint and so the only way to drop it
+                // (if you don't want to go the route of first creating a constraint and then drop that, where the index would be dropped along with it),
+                // is to do "DROP INDEX ON :Label(name) which has the type as GENERAL and would miss it.
+                rule = schemaStorage.indexGetForSchema( index, false );
+            }
+        }
         if ( rule != null )
         {
             recordState.dropSchemaRule( rule );

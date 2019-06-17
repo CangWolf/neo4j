@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -50,7 +50,7 @@ case class NodeLeftOuterHashJoinPipe(nodeVariables: Set[String],
           rhsKeys.add(joinKey)
           lhsRows.map { lhsRow =>
             val outputRow = executionContextFactory.copyWith(lhsRow)
-            outputRow.mergeWith(rhsRow)
+            outputRow.mergeWith(rhsRow, state.query)
             outputRow
           }
         }).flatten

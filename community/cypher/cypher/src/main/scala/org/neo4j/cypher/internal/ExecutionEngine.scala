@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -20,6 +20,7 @@
 package org.neo4j.cypher.internal
 
 import java.time.Clock
+import java.util.function.Supplier
 
 import org.neo4j.cypher.internal.QueryCache.ParameterTypeMap
 import org.neo4j.cypher.internal.compatibility.CypherCacheMonitor
@@ -77,8 +78,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
   private val queryCache: QueryCache[String,Pair[String, ParameterTypeMap], ExecutableQuery] =
     new QueryCache[String, Pair[String, ParameterTypeMap], ExecutableQuery](config.queryCacheSize, planStalenessCaller, cacheTracer)
 
-  private val masterCompiler: MasterCompiler =
-    new MasterCompiler(queryService, kernelMonitors, config, logProvider, new CompilerLibrary(compatibilityFactory))
+  private val masterCompiler: MasterCompiler = new MasterCompiler(config, new CompilerLibrary(compatibilityFactory))
 
   private val schemaHelper = new SchemaHelper(queryCache)
 
@@ -97,7 +97,7 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
         checkParameters(executableQuery.paramNames, params, executableQuery.extractedParams)
       }
       val combinedParams = params.updatedWith(executableQuery.extractedParams)
-      context.executingQuery().compilationCompleted(executableQuery.compilerInfo)
+      context.executingQuery().compilationCompleted(executableQuery.compilerInfo, supplier(executableQuery.planDescription()))
       executableQuery.execute(context, preParsedQuery, combinedParams)
 
     } catch {
@@ -197,6 +197,11 @@ class ExecutionEngine(val queryService: GraphDatabaseQueryService,
       }
     }
   }
+
+  private def supplier[T](t: => T): Supplier[T] =
+    new Supplier[T] {
+      override def get(): T = t
+    }
 }
 
 object ExecutionEngine {

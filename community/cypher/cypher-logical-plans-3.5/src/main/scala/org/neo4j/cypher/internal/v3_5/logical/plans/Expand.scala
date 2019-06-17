@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -82,9 +82,9 @@ case class VarExpand(source: LogicalPlan,
                      length: VarPatternLength,
                      mode: ExpansionMode = ExpandAll,
                      tempNode: String,
-                     tempEdge: String,
+                     tempRelationship: String,
                      nodePredicate: Expression,
-                     edgePredicate: Expression,
+                     relationshipPredicate: Expression,
                      legacyPredicates: Seq[(LogicalVariable, Expression)])
                     (implicit idGen: IdGen) extends LogicalPlan(idGen) with LazyLogicalPlan {
   override val lhs = Some(source)

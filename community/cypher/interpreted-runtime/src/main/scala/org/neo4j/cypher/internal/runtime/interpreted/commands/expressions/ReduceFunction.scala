@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -42,7 +42,7 @@ case class ReduceFunction(collection: Expression, id: String, expression: Expres
   def rewrite(f: (Expression) => Expression) =
     f(ReduceFunction(collection.rewrite(f), id, expression.rewrite(f), acc, init.rewrite(f)))
 
-  def arguments: Seq[Expression] = Seq(collection, init)
+  override def arguments: Seq[Expression] = Seq(collection, init)
 
   override def children = Seq(collection, expression, init)
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -19,7 +19,7 @@
  */
 package org.neo4j.kernel.impl.api.index;
 
-import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
@@ -40,6 +40,8 @@ import org.neo4j.logging.LogProvider;
 import org.neo4j.storageengine.api.EntityType;
 import org.neo4j.util.FeatureToggles;
 
+import static java.lang.Integer.min;
+import static java.lang.String.format;
 import static java.util.stream.Collectors.joining;
 import static org.neo4j.helpers.NamedThreadFactory.daemon;
 
@@ -64,8 +66,10 @@ public class BatchingMultipleIndexPopulator extends MultipleIndexPopulator
     private static final String EOL = System.lineSeparator();
     private static final String FLUSH_THREAD_NAME_PREFIX = "Index Population Flush Thread";
 
+    // Maximum number of workers processing batches of updates from the scan. It is capped because there's only a single
+    // thread generating updates and it generally cannot saturate all the workers anyway.
     private final int MAXIMUM_NUMBER_OF_WORKERS = FeatureToggles.getInteger( getClass(), MAXIMUM_NUMBER_OF_WORKERS_NAME,
-            Runtime.getRuntime().availableProcessors() - 1 );
+            min( 8, Runtime.getRuntime().availableProcessors() - 1 ) );
     private final int TASK_QUEUE_SIZE = FeatureToggles.getInteger( getClass(), TASK_QUEUE_SIZE_NAME,
             getNumberOfPopulationWorkers() * 2 );
     private final int AWAIT_TIMEOUT_MINUTES = FeatureToggles.getInteger( getClass(), AWAIT_TIMEOUT_MINUTES_NAME, 30 );
@@ -154,20 +158,34 @@ public class BatchingMultipleIndexPopulator extends MultipleIndexPopulator
 
     /**
      * Insert the given batch of updates into the index defined by the given {@link IndexPopulation}.
+     * Called from {@link MultipleIndexPopulator#flush(IndexPopulation)}.
      *
      * @param population the index population.
      */
     @Override
-    protected void flush( IndexPopulation population )
+    void doFlush( IndexPopulation population )
     {
         activeTasks.incrementAndGet();
-        Collection<IndexEntryUpdate<?>> batch = population.takeCurrentBatch();
+        List<IndexEntryUpdate<?>> batch = population.takeCurrentBatch();
 
         executor.execute( () ->
         {
             try
             {
+                String batchDescription = "EMPTY";
+                if ( PRINT_DEBUG )
+                {
+                    if ( !batch.isEmpty() )
+                    {
+                        batchDescription = format( "[%d, %d - %d]", batch.size(), batch.get( 0 ).getEntityId(), batch.get( batch.size() - 1 ).getEntityId() );
+                    }
+                    log.info( "Applying scan batch %s", batchDescription );
+                }
                 population.populator.add( batch );
+                if ( PRINT_DEBUG )
+                {
+                    log.info( "Applied scan batch %s", batchDescription );
+                }
             }
             catch ( Throwable failure )
             {

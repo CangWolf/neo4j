@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -53,8 +53,13 @@ public class InterruptedState implements BoltStateMachineState
                 context.connectionState().markIgnored();
                 return this;
             }
-            boolean success = context.resetMachine();
-            return success ? readyState : null;
+
+            if ( context.resetMachine() )
+            {
+                context.connectionState().resetPendingFailedAndIgnored();
+                return readyState;
+            }
+            return null;
         }
         else
         {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -270,11 +270,11 @@ public abstract class NativeIndexProviderTests
         assertEquals( expected, state );
         if ( InternalIndexState.POPULATING == expected )
         {
-            logging.assertContainsLogCallContaining( "Failed to open index" );
+            logging.rawMessageMatcher().assertContains( "Failed to open index" );
         }
         else
         {
-            logging.assertNoLogCallContaining( "Failed to open index" );
+            logging.rawMessageMatcher().assertNotContains( "Failed to open index" );
         }
     }
 

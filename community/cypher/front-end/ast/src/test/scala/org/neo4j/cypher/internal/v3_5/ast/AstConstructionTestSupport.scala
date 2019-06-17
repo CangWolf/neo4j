@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +17,7 @@
 package org.neo4j.cypher.internal.v3_5.ast
 
 import org.neo4j.cypher.internal.v3_5.expressions._
+import org.neo4j.cypher.internal.v3_5.expressions.functions.Exists
 import org.neo4j.cypher.internal.v3_5.util.test_helpers.CypherTestSupport
 import org.neo4j.cypher.internal.v3_5.util.{DummyPosition, InputPosition}
 
@@ -29,17 +30,20 @@ trait AstConstructionTestSupport extends CypherTestSupport {
 
   def varFor(name: String): Variable = Variable(name)(pos)
 
-  def lblName(s: String) = LabelName(s)(pos)
+  def lblName(s: String): LabelName = LabelName(s)(pos)
 
-  def hasLabels(v: String, label: String) =
+  def hasLabels(v: String, label: String): HasLabels =
     HasLabels(varFor(v), Seq(lblName(label)))(pos)
 
-  def prop(variable: String, propKey: String) = Property(varFor(variable), PropertyKeyName(propKey)(pos))(pos)
+  def exists(e: Expression): FunctionInvocation =
+    FunctionInvocation(FunctionName(Exists.name)(e.position), e)(e.position)
 
-  def propEquality(variable: String, propKey: String, intValue: Int) =
+  def prop(variable: String, propKey: String): Property = Property(varFor(variable), PropertyKeyName(propKey)(pos))(pos)
+
+  def propEquality(variable: String, propKey: String, intValue: Int): Equals =
     Equals(prop(variable, propKey), literalInt(intValue))(pos)
 
-  def propLessThan(variable: String, propKey: String, intValue: Int) =
+  def propLessThan(variable: String, propKey: String, intValue: Int): LessThan =
     LessThan(prop(variable, propKey), literalInt(intValue))(pos)
 
   def literalInt(intValue: Int): SignedDecimalIntegerLiteral =
@@ -69,4 +73,7 @@ trait AstConstructionTestSupport extends CypherTestSupport {
   })(pos)
 
   def TRUE: Expression = True()(pos)
+
+  def function(name: String, args: Expression*): FunctionInvocation =  FunctionInvocation(FunctionName(name)(pos),
+                                                                                          distinct = false, args.toIndexedSeq)(pos)
 }

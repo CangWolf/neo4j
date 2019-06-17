@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -72,7 +72,6 @@ import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexPopulator;
 import org.neo4j.kernel.api.index.IndexProvider;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
 import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
@@ -104,6 +103,7 @@ import org.neo4j.logging.AssertableLogProvider;
 import org.neo4j.logging.NullLog;
 import org.neo4j.logging.NullLogProvider;
 import org.neo4j.scheduler.ThreadPoolJobScheduler;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.StorageEngine;
 import org.neo4j.storageengine.api.schema.IndexReader;
 import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
@@ -194,8 +194,8 @@ public class RecoveryIT
         {
             assertEquals( 10, count( recoveredDatabase.getAllNodes() ) );
         }
-        logProvider.assertContainsMessageContaining( "10% completed" );
-        logProvider.assertContainsMessageContaining( "100% completed" );
+        logProvider.rawMessageMatcher().assertContains( "10% completed" );
+        logProvider.rawMessageMatcher().assertContains( "100% completed" );
 
         database.shutdown();
         recoveredDatabase.shutdown();

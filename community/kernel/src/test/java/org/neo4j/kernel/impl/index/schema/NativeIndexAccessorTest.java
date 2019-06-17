@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -189,8 +189,11 @@ public class NativeIndexAccessorTest<KEY extends NativeIndexKey<KEY>, VALUE exte
     private static AccessorFactory<GenericKey,NativeIndexValue> genericAccessorFactory()
     {
         return ( pageCache, fs, storeFile, layout, cleanup, monitor, descriptor, directory ) ->
-                new GenericNativeIndexAccessor( pageCache, fs, storeFile, layout, cleanup, monitor, descriptor, spaceFillingCurveSettings,
-                        directory, configuration );
+        {
+            IndexDropAction dropAction = new FileSystemIndexDropAction( fs, directory );
+            return new GenericNativeIndexAccessor( pageCache, fs, storeFile, layout, cleanup, monitor, descriptor, spaceFillingCurveSettings,
+                    configuration, dropAction );
+        };
     }
 
     @FunctionalInterface

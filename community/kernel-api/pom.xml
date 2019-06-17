@@ -3,7 +3,7 @@
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>3.5.1-SNAPSHOT</version>
+    <version>3.5.7-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
@@ -15,7 +15,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>neo4j-kernel-api</artifactId>
-  <version>3.5.1-SNAPSHOT</version>
+  <version>3.5.7-SNAPSHOT</version>
 
   <packaging>jar</packaging>
   <name>Neo4j - Kernel API</name>
@@ -93,6 +93,12 @@ the relevant Commercial Agreement.
             <version>${project.version}</version>
             <scope>test</scope>
             <type>test-jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.neo4j</groupId>
+            <artifactId>neo4j-random-values</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
         </dependency>
 
         <dependency>

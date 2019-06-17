@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -74,6 +74,7 @@ import org.neo4j.kernel.api.schema.constraints.NodeExistenceConstraintDescriptor
 import org.neo4j.kernel.api.schema.constraints.NodeKeyConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constraints.RelExistenceConstraintDescriptor;
 import org.neo4j.kernel.api.schema.constraints.UniquenessConstraintDescriptor;
+import org.neo4j.kernel.impl.api.index.IndexPopulationFailure;
 import org.neo4j.storageengine.api.EntityType;
 import org.neo4j.storageengine.api.schema.PopulationProgress;
 import org.neo4j.storageengine.api.schema.SchemaRule;
@@ -201,7 +202,10 @@ public class SchemaImpl implements Schema
             case ONLINE:
                 return;
             case FAILED:
-                throw new IllegalStateException( "Index entered a FAILED state. Please see database logs." );
+                String cause = getIndexFailure( index );
+                String message = IndexPopulationFailure
+                        .appendCauseOfFailure( String.format( "Index %s entered a %s state. Please see database logs.", index, state ), cause );
+                throw new IllegalStateException( message );
             default:
                 try
                 {
@@ -311,7 +315,7 @@ public class SchemaImpl implements Schema
             SchemaRead schemaRead = transaction.schemaRead();
             IndexReference descriptor = getIndexReference( schemaRead, transaction.tokenRead(), (IndexDefinitionImpl) index );
             PopulationProgress progress = schemaRead.indexGetPopulationProgress( descriptor );
-            return new IndexPopulationProgress( progress.getCompleted(), progress.getTotal() );
+            return progress.toIndexPopulationProgress();
         }
         catch ( SchemaRuleNotFoundException | IndexNotFoundKernelException e )
         {

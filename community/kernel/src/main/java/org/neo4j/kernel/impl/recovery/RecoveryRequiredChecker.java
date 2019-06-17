@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -69,5 +69,14 @@ public class RecoveryRequiredChecker
                                            .withLogEntryReader( reader ).build();
         LogTailScanner tailScanner = new LogTailScanner( logFiles, reader, monitors );
         return new RecoveryStartInformationProvider( tailScanner, NO_MONITOR ).get().isRecoveryRequired();
+    }
+
+    public static void assertRecoveryIsNotRequired( FileSystemAbstraction fs, PageCache pageCache, Config config, DatabaseLayout databaseLayout,
+            Monitors monitors ) throws RecoveryRequiredException, IOException
+    {
+        if ( new RecoveryRequiredChecker( fs, pageCache, config, monitors ).isRecoveryRequiredAt( databaseLayout ) )
+        {
+            throw new RecoveryRequiredException();
+        }
     }
 }

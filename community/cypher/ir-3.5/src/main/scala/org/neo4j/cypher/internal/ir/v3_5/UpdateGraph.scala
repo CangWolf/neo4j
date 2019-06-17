@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -64,21 +64,10 @@ trait UpdateGraph {
    */
   def identifiersToDelete: Set[String] = (deleteExpressions flatMap {
     // DELETE n
-    case DeleteExpression(identifier: Variable, _) => Seq(identifier.name)
     // DELETE (n)-[r]-()
-    case DeleteExpression(PathExpression(e), _) => e.dependencies.map(_.asInstanceOf[Variable].name)
     // DELETE expr
-    case DeleteExpression(expr, _) => Seq(findVariableInNestedStructure(expr))
+    case DeleteExpression(expr, _) => expr.dependencies.map(_.name)
   }).toSet
-
-  @tailrec
-  private def findVariableInNestedStructure(e: Expression): String = e match {
-    case v: Variable => v.name
-    // DELETE coll[i]
-    case ContainerIndex(expr, _) => findVariableInNestedStructure(expr)
-    // DELETE map.key
-    case Property(expr, _) => findVariableInNestedStructure(expr)
-  }
 
   /*
    * Finds all node properties being created with CREATE (:L)
@@ -379,7 +368,7 @@ trait UpdateGraph {
 
   /*
    * Checks for overlap between what relationship props are read in query graph
-   * and what is updated with SET her
+   * and what is updated with SET here
    */
   private def setRelPropertyOverlap(propertiesToRead: Set[PropertyKeyName]): Boolean = {
     @tailrec

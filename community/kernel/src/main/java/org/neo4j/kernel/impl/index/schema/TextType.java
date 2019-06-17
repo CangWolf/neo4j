@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -68,7 +68,7 @@ class TextType extends Type
     void copyValue( GenericKey to, GenericKey from )
     {
         to.long0 = from.long0;
-        to.long1 = from.long1;
+        // don't copy long1 since it's instance-local (bytesDereferenced)
         to.long2 = from.long2;
         to.long3 = from.long3;
         setBytesLength( to, (int) from.long0 );

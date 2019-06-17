@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -23,16 +23,19 @@ import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexPopulator;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
+import org.neo4j.kernel.impl.api.index.PhaseTracker;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.schema.IndexSample;
 import org.neo4j.util.concurrent.Work;
 import org.neo4j.util.concurrent.WorkSync;
+import org.neo4j.values.storable.Value;
 
 /**
  * Takes a {@link NativeIndexPopulator}, which is intended for single-threaded population and wraps it in a populator
@@ -135,6 +138,18 @@ class WorkSyncedNativeIndexPopulator<KEY extends NativeIndexKey<KEY>, VALUE exte
     public void consistencyCheck()
     {
         actual.consistencyCheck();
+    }
+
+    @Override
+    public void scanCompleted( PhaseTracker phaseTracker ) throws IndexEntryConflictException
+    {
+        actual.scanCompleted( phaseTracker );
+    }
+
+    @Override
+    public Map<String,Value> indexConfig()
+    {
+        return actual.indexConfig();
     }
 
     private class IndexUpdateApply

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -39,7 +39,6 @@ case class SymbolTable(variables: Map[String, CypherType] = Map.empty) {
 
   def filter(f: String => Boolean): SymbolTable = SymbolTable(variables.filterKeys(f))
   def keys: Seq[String] = variables.keys.toIndexedSeq
-  def missingSymbolTableDependencies(x: TypeSafe): Set[String] = x.symbolTableDependencies.filterNot(dep => variables.exists(_._1 == dep))
 
   def evaluateType(name: String, expectedType: CypherType): CypherType = variables.get(name) match {
     case Some(typ) if expectedType.isAssignableFrom(typ) => typ

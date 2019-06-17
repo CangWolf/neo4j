@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,9 +16,9 @@
  */
 package org.neo4j.cypher.internal.v3_5.frontend.phases
 
+import org.neo4j.cypher.internal.v3_5.rewriting.AstRewritingMonitor
 import org.neo4j.cypher.internal.v3_5.rewriting.rewriters._
 import org.neo4j.cypher.internal.v3_5.util.{Rewriter, inSequence}
-import org.neo4j.cypher.internal.v3_5.rewriting.AstRewritingMonitor
 
 case object CNFNormalizer extends StatementRewriter {
 
@@ -29,6 +29,7 @@ case object CNFNormalizer extends StatementRewriter {
     inSequence(
       deMorganRewriter(),
       distributeLawsRewriter(),
+      normalizeInequalities,
       flattenBooleanOperators,
       simplifyPredicates,
       // Redone here since CNF normalization might introduce negated inequalities (which this removes)

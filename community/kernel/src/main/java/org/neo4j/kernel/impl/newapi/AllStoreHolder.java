@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -718,12 +718,7 @@ public class AllStoreHolder extends Read
         {
             constraints = ktx.txState().constraintsChanges().apply( constraints );
         }
-        return Iterators.map( constraintDescriptor ->
-        {
-            SchemaDescriptor schema = constraintDescriptor.schema();
-            ktx.statementLocks().pessimistic().acquireShared( ktx.lockTracer(), schema.keyType(), schema.keyId() );
-            return constraintDescriptor;
-        }, constraints );
+        return Iterators.map( this::lockConstraint, constraints );
     }
 
     @Override
@@ -1147,5 +1142,12 @@ public class AllStoreHolder extends Read
         {
             throw new IndexNotFoundKernelException( "No index was found" );
         }
+    }
+
+    private ConstraintDescriptor lockConstraint( ConstraintDescriptor constraint )
+    {
+        SchemaDescriptor schema = constraint.schema();
+        ktx.statementLocks().pessimistic().acquireShared( ktx.lockTracer(), schema.keyType(), schema.keyId() );
+        return constraint;
     }
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -76,8 +76,6 @@ case class TransactionalContextWrapper(tc: TransactionalContext) extends QueryTr
   def restrictCurrentTransaction(context: SecurityContext): Revertable = tc.restrictCurrentTransaction(context)
 
   def securityContext: SecurityContext = tc.securityContext
-
-  def notifyCompilationCompleted(compilerInfo: CompilerInfo): Unit = tc.executingQuery().compilationCompleted(compilerInfo)
 
   def kernelStatisticProvider: KernelStatisticProvider = new ProfileKernelStatisticProvider(tc.kernelStatisticProvider())
 

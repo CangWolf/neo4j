@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -113,6 +113,18 @@ object PlanDescriptionArgumentSerializer {
 
   def removeGeneratedNames(s: String): String = {
     val named = UNNAMED_PATTERN.replaceAllIn(s, m => s"anon[${m group 2}]")
-    DEDUP_PATTERN.replaceAllIn(named, _.group(1))
+    deduplicateVariableNames(named)
+  }
+
+  def deduplicateVariableNames(in: String): String = {
+    val sb = new StringBuilder
+    var i = 0
+    for (m <- DEDUP_PATTERN.findAllMatchIn(in)) {
+      sb ++= in.substring(i, m.start)
+      sb ++= m.group(1)
+      i = m.end
+    }
+    sb ++= in.substring(i)
+    sb.toString()
   }
 }

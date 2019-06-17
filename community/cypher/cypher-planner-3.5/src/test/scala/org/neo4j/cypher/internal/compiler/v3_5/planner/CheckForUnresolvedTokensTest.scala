@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -164,6 +164,19 @@ class CheckForUnresolvedTokensTest extends CypherFunSuite with AstRewritingTestS
       //when
       val ast = parse(s"MATCH (a) WHERE duration(a.prop).${property.propertyKey} = 42 RETURN a")
 
+      //then
+      checkForTokens(ast, semanticTable) shouldBe empty
+    }
+  }
+
+  test("don't warn when using special property keys, independent of case") {
+    //given
+    val semanticTable = new SemanticTable
+    semanticTable.resolvedPropertyKeyNames.put("prop", PropertyKeyId(42))
+
+    Seq("X", "yEaRs", "DAY", "epochMillis").foreach { property =>
+      //when
+      val ast = parse(s"MATCH (a) WHERE a.prop.$property = 42 RETURN a")
       //then
       checkForTokens(ast, semanticTable) shouldBe empty
     }

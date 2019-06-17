@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -94,7 +94,7 @@ public enum DatabaseFile
         return names;
     }
 
-    String getName()
+    public String getName()
     {
         Preconditions.checkState( names.size() == 1, "Database file has more then one file names." );
         return names.get( 0 );

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -75,7 +75,7 @@ class CommunityCompilerFactory(graph: GraphDatabaseQueryService,
           Cypher34Planner(plannerConfig, MasterCompiler.CLOCK, kernelMonitors, log,
             cypherPlanner, cypherUpdateStrategy, LastCommittedTxIdProvider(graph)),
           CommunityRuntimeFactory.getRuntime(cypherRuntime, plannerConfig.useErrorsOverWarnings),
-          CommunityRuntimeContextCreator(plannerConfig),
+          CommunityRuntimeContextCreator(log, plannerConfig),
           kernelMonitors
         )
 
@@ -85,7 +85,7 @@ class CommunityCompilerFactory(graph: GraphDatabaseQueryService,
           Cypher35Planner(plannerConfig, MasterCompiler.CLOCK, kernelMonitors, log,
                           cypherPlanner, cypherUpdateStrategy, LastCommittedTxIdProvider(graph)),
           CommunityRuntimeFactory.getRuntime(cypherRuntime, plannerConfig.useErrorsOverWarnings),
-          CommunityRuntimeContextCreator(plannerConfig),
+          CommunityRuntimeContextCreator(log, plannerConfig),
           kernelMonitors
         )
     }

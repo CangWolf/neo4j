@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -46,7 +46,7 @@ object TransactionBoundPlanContext {
       new MutableGraphStatisticsSnapshot()))
 }
 
-class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: InternalNotificationLogger, graphStatistics: GraphStatistics)
+class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: InternalNotificationLogger, graphStatistics: InstrumentedGraphStatistics)
   extends TransactionBoundTokenContext(tc.kernelTransaction) with PlanContext with IndexDescriptorCompatibility {
 
   override def indexesGetForLabel(labelId: Int): Iterator[IndexDescriptor] = {
@@ -88,6 +88,7 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
       case InternalIndexState.ONLINE =>
         val label = LabelId(reference.schema().getEntityTokenIds()(0))
         val properties = reference.properties().map(PropertyKeyId)
+        val isUnique = reference.isUnique
         val limitations = reference.limitations().map(kernelToCypher).toSet
         val orderCapability: OrderCapability = tps => {
            reference.orderCapability(tps.map(typeToValueCategory): _*) match {
@@ -112,7 +113,7 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
           // Also, ignore eventually consistent indexes. Those are for explicit querying via procesures.
           None
         } else {
-          Some(IndexDescriptor(label, properties, limitations, orderCapability, valueCapability))
+          Some(IndexDescriptor(label, properties, limitations, orderCapability, valueCapability, isUnique))
         }
       case _ => None
     }
@@ -162,7 +163,7 @@ class TransactionBoundPlanContext(tc: TransactionalContextWrapper, logger: Inter
     }
   }
 
-  override val statistics: GraphStatistics = graphStatistics
+  override val statistics: InstrumentedGraphStatistics = graphStatistics
 
   override val txIdProvider = LastCommittedTxIdProvider(tc.graph)
 

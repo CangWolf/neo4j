@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,7 @@ case class NodeHashJoinPipe(nodeVariables: Set[String], left: Pipe, right: Pipe)
           val lhsRows = table.getOrElse(joinKey, mutable.MutableList.empty)
           lhsRows.map { lhsRow =>
             val output = lhsRow.createClone()
-            output.mergeWith(rhsRow)
+            output.mergeWith(rhsRow, state.query)
             output
           }
         }

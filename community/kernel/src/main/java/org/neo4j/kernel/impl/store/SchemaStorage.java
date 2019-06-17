@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -48,18 +48,31 @@ public class SchemaStorage implements SchemaRuleAccess
     }
 
     /**
-     * Find the IndexRule that matches the given IndexDescriptor.
+     * Find the IndexRule that matches the given IndexDescriptor. Filters on index type.
      *
-     * @return  the matching IndexRule, or null if no matching IndexRule was found
-     * @throws  IllegalStateException if more than one matching rule.
+     * @return the matching IndexRule, or null if no matching IndexRule was found
+     * @throws IllegalStateException if more than one matching rule.
      * @param descriptor the target IndexDescriptor
      */
     public StoreIndexDescriptor indexGetForSchema( final IndexDescriptor descriptor )
     {
-        Iterator<StoreIndexDescriptor> indexes = loadAllSchemaRules( descriptor::equals, StoreIndexDescriptor.class, false );
+        return indexGetForSchema( descriptor, true );
+    }
+
+    /**
+     * Find the IndexRule that matches the given IndexDescriptor.
+     *
+     * @return the matching IndexRule, or null if no matching IndexRule was found
+     * @throws IllegalStateException if more than one matching rule.
+     * @param descriptor the target IndexDescriptor
+     * @param filterOnType whether or not to filter on index type. If {@code false} then only {@link SchemaDescriptor} will be compared.
+     */
+    public StoreIndexDescriptor indexGetForSchema( final IndexDescriptor descriptor, boolean filterOnType )
+    {
+        Predicate<StoreIndexDescriptor> filter = filterOnType ? descriptor::equals : candidate -> candidate.schema().equals( descriptor.schema() );
+        Iterator<StoreIndexDescriptor> indexes = loadAllSchemaRules( filter, StoreIndexDescriptor.class, false );
 
         StoreIndexDescriptor foundRule = null;
-
         while ( indexes.hasNext() )
         {
             StoreIndexDescriptor candidate = indexes.next();
@@ -72,6 +85,26 @@ public class SchemaStorage implements SchemaRuleAccess
         }
 
         return foundRule;
+    }
+
+    /**
+     * Find the IndexRule that has the given user supplied name.
+     *
+     * @param indexName the user supplied index name to look for.
+     * @return the matching IndexRule, or null if no matching index rule was found.
+     */
+    public StoreIndexDescriptor indexGetForName( String indexName )
+    {
+        Iterator<StoreIndexDescriptor> itr = indexesGetAll();
+        while ( itr.hasNext() )
+        {
+            StoreIndexDescriptor sid = itr.next();
+            if ( sid.getUserSuppliedName().map( n -> n.equals( indexName ) ).orElse( false ) )
+            {
+                return sid;
+            }
+        }
+        return null;
     }
 
     public Iterator<StoreIndexDescriptor> indexesGetAll()

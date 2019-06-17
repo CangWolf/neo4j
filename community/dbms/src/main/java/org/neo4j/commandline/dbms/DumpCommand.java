@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -28,11 +28,13 @@ import java.nio.file.NoSuchFileException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Objects;
+import java.util.function.Predicate;
 
 import org.neo4j.commandline.admin.AdminCommand;
 import org.neo4j.commandline.admin.CommandFailed;
 import org.neo4j.commandline.admin.IncorrectUsage;
 import org.neo4j.commandline.arguments.Arguments;
+import org.neo4j.dbms.archive.CompressionFormat;
 import org.neo4j.dbms.archive.Dumper;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
 import org.neo4j.io.fs.DefaultFileSystemAbstraction;
@@ -43,6 +45,7 @@ import org.neo4j.kernel.StoreLockException;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.pagecache.ConfigurableStandalonePageCacheFactory;
 import org.neo4j.kernel.impl.recovery.RecoveryRequiredChecker;
+import org.neo4j.kernel.impl.recovery.RecoveryRequiredException;
 import org.neo4j.kernel.impl.util.Validators;
 import org.neo4j.kernel.monitoring.Monitors;
 import org.neo4j.scheduler.JobScheduler;
@@ -52,12 +55,10 @@ import static org.neo4j.commandline.Util.canonicalPath;
 import static org.neo4j.commandline.arguments.common.Database.ARG_DATABASE;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.database_path;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.logical_logs_location;
-import static org.neo4j.helpers.Strings.joinAsLines;
 import static org.neo4j.kernel.impl.scheduler.JobSchedulerFactory.createInitialisedScheduler;
 
 public class DumpCommand implements AdminCommand
 {
-
     private static final Arguments arguments = new Arguments()
             .withDatabase()
             .withTo( "Destination (file or folder) of database dump." );
@@ -144,7 +145,8 @@ public class DumpCommand implements AdminCommand
         try
         {
             File storeLockFile = databaseLayout.getStoreLayout().storeLockFile();
-            dumper.dump( databasePath, transactionalLogsDirectory, archive, path -> Objects.equals( path.getFileName().toString(), storeLockFile.getName() ) );
+            Predicate<Path> pathPredicate = path -> Objects.equals( path.getFileName().toString(), storeLockFile.getName() );
+            dumper.dump( databasePath, transactionalLogsDirectory, archive, CompressionFormat.ZSTD, pathPredicate );
         }
         catch ( FileAlreadyExistsException e )
         {
@@ -170,18 +172,11 @@ public class DumpCommand implements AdminCommand
                 JobScheduler jobScheduler = createInitialisedScheduler();
                 PageCache pageCache = ConfigurableStandalonePageCacheFactory.createPageCache( fileSystem, additionalConfiguration, jobScheduler ) )
         {
-            RecoveryRequiredChecker requiredChecker = new RecoveryRequiredChecker( fileSystem, pageCache, additionalConfiguration, new Monitors() );
-            if ( requiredChecker.isRecoveryRequiredAt( databaseLayout ) )
-            {
-                throw new CommandFailed( joinAsLines(
-                        "Active logical log detected, this might be a source of inconsistencies.",
-                        "Please recover database before running the dump.",
-                        "To perform recovery please start database and perform clean shutdown." ) );
-            }
+            RecoveryRequiredChecker.assertRecoveryIsNotRequired( fileSystem, pageCache, additionalConfiguration, databaseLayout, new Monitors() );
         }
-        catch ( CommandFailed cf )
+        catch ( RecoveryRequiredException rre )
         {
-            throw cf;
+            throw new CommandFailed( rre.getMessage() );
         }
         catch ( Exception e )
         {

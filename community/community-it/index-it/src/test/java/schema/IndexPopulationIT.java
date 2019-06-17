@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -39,7 +39,6 @@ import org.neo4j.graphdb.Node;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.Result;
 import org.neo4j.graphdb.Transaction;
-import org.neo4j.graphdb.factory.GraphDatabaseFactory;
 import org.neo4j.helpers.collection.Iterables;
 import org.neo4j.helpers.collection.Iterators;
 import org.neo4j.kernel.impl.api.index.IndexPopulationJob;
@@ -48,7 +47,9 @@ import org.neo4j.test.TestGraphDatabaseFactory;
 import org.neo4j.test.rule.TestDirectory;
 import org.neo4j.values.storable.RandomValues;
 
+import static org.hamcrest.Matchers.containsString;
 import static org.junit.Assert.assertEquals;
+import static org.neo4j.logging.AssertableLogProvider.inLog;
 
 public class IndexPopulationIT
 {
@@ -58,11 +59,15 @@ public class IndexPopulationIT
     private static final int TEST_TIMEOUT = 120_000;
     private static GraphDatabaseService database;
     private static ExecutorService executorService;
+    private static AssertableLogProvider logProvider;
 
     @BeforeClass
     public static void setUp()
     {
-        database = new GraphDatabaseFactory().newEmbeddedDatabase( directory.storeDir() );
+        TestGraphDatabaseFactory factory = new TestGraphDatabaseFactory();
+        logProvider = new AssertableLogProvider( true );
+        factory.setInternalLogProvider( logProvider );
+        database = factory.newEmbeddedDatabase( directory.storeDir() );
         executorService = Executors.newCachedThreadPool();
     }
 
@@ -155,6 +160,39 @@ public class IndexPopulationIT
         }
         shutDownDb.shutdown();
         assertableLogProvider.assertNone( AssertableLogProvider.inLog( IndexPopulationJob.class ).anyError() );
+    }
+
+    @Test
+    public void mustLogPhaseTracker()
+    {
+        Label nodeLabel = Label.label( "testLabel5" );
+        String key = "key";
+        String value = "hej";
+        try ( Transaction transaction = database.beginTx() )
+        {
+            database.createNode( nodeLabel ).setProperty( key, value );
+            transaction.success();
+        }
+
+        // when
+        try ( Transaction tx = database.beginTx() )
+        {
+            database.schema().indexFor( nodeLabel ).on( key ).create();
+            tx.success();
+        }
+        waitForOnlineIndexes();
+
+        // then
+        try ( Transaction tx = database.beginTx() )
+        {
+            ResourceIterator<Node> nodes = database.findNodes( nodeLabel, key, value );
+            long nodeCount = Iterators.count( nodes );
+            assertEquals( "expected exactly one hit in index but was ",1, nodeCount );
+            nodes.close();
+            tx.success();
+        }
+        AssertableLogProvider.LogMatcher matcher = inLog( IndexPopulationJob.class ).info( containsString( "TIME/PHASE Final:" ) );
+        logProvider.assertAtLeastOnce( matcher );
     }
 
     private void prePopulateDatabase( GraphDatabaseService database, Label testLabel, String propertyName )

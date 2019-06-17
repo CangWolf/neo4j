@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -81,9 +81,9 @@ public class RelationshipProxy implements Relationship, RelationshipVisitor<Runt
         this.endNode = endNode;
     }
 
-    private void initializeData()
+    public boolean initializeData()
     {
-        // it enough to check only start node, since it's absence will indicate that data was not yet loaded
+        // It enough to check only start node, since it's absence will indicate that data was not yet loaded.
         if ( startNode == AbstractBaseRecord.NO_ID )
         {
             KernelTransaction transaction = spi.kernelTransaction();
@@ -91,13 +91,16 @@ public class RelationshipProxy implements Relationship, RelationshipVisitor<Runt
             {
                 RelationshipScanCursor relationships = transaction.ambientRelationshipCursor();
                 transaction.dataRead().singleRelationship( id, relationships );
-                //at this point we don't care if it is there or not just load what we got
-                relationships.next();
+                // At this point we don't care if it is there or not just load what we got.
+                boolean wasPresent = relationships.next();
                 this.type = relationships.type();
                 this.startNode = relationships.sourceNodeReference();
                 this.endNode = relationships.targetNodeReference();
+                // But others might care, e.g. the Bolt server needs to know for serialisation purposes.
+                return wasPresent;
             }
         }
+        return true;
     }
 
     @Override

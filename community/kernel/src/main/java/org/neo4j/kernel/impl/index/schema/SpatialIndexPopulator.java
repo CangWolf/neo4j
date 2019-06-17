@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -30,12 +30,13 @@ import org.neo4j.io.fs.FileSystemAbstraction;
 import org.neo4j.io.pagecache.IOLimiter;
 import org.neo4j.io.pagecache.PageCache;
 import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
+import org.neo4j.kernel.api.index.IndexConfigProvider;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexPopulator;
 import org.neo4j.kernel.api.index.IndexProvider;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
 import org.neo4j.kernel.impl.index.schema.config.SpaceFillingCurveSettings;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.schema.IndexSample;
 import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
 import org.neo4j.values.storable.CoordinateReferenceSystem;
@@ -143,10 +144,22 @@ class SpatialIndexPopulator extends SpatialIndexCache<WorkSyncedNativeIndexPopul
         return combineSamples( samples );
     }
 
+    @Override
+    public Map<String,Value> indexConfig()
+    {
+        Map<String,Value> indexConfig = new HashMap<>();
+        for ( IndexPopulator part : this )
+        {
+            IndexConfigProvider.putAllNoOverwrite( indexConfig, part.indexConfig() );
+        }
+        return indexConfig;
+    }
+
     static class PartPopulator extends NativeIndexPopulator<SpatialIndexKey,NativeIndexValue>
     {
         private final SpaceFillingCurveConfiguration configuration;
         private final SpaceFillingCurveSettings settings;
+        private final CoordinateReferenceSystem crs;
 
         PartPopulator( PageCache pageCache, FileSystemAbstraction fs, SpatialIndexFiles.SpatialFileLayout fileLayout, IndexProvider.Monitor monitor,
                 StoreIndexDescriptor descriptor, SpaceFillingCurveConfiguration configuration )
@@ -154,6 +167,7 @@ class SpatialIndexPopulator extends SpatialIndexCache<WorkSyncedNativeIndexPopul
             super( pageCache, fs, fileLayout.getIndexFile(), fileLayout.layout, monitor, descriptor, NO_HEADER_WRITER );
             this.configuration = configuration;
             this.settings = fileLayout.settings;
+            this.crs = fileLayout.spatialFile.crs;
         }
 
         @Override
@@ -170,12 +184,12 @@ class SpatialIndexPopulator extends SpatialIndexCache<WorkSyncedNativeIndexPopul
         }
 
         @Override
-        ConflictDetectingValueMerger<SpatialIndexKey,NativeIndexValue> getMainConflictDetector()
+        ConflictDetectingValueMerger<SpatialIndexKey,NativeIndexValue,Value[]> getMainConflictDetector()
         {
             // Because of lossy point representation in index we need to always compare on node id,
             // even for unique indexes. If we don't we risk throwing constraint violation exception
             // for points that are in fact unique.
-            return new ConflictDetectingValueMerger<>( true );
+            return new ThrowingConflictDetector<>( true );
         }
 
         @Override
@@ -194,6 +208,14 @@ class SpatialIndexPopulator extends SpatialIndexCache<WorkSyncedNativeIndexPopul
         void markTreeAsOnline()
         {
             tree.checkpoint( IOLimiter.UNLIMITED, settings.headerWriter( BYTE_ONLINE ) );
+        }
+
+        @Override
+        public Map<String,Value> indexConfig()
+        {
+            Map<String,Value> map = new HashMap<>();
+            SpatialIndexConfig.addSpatialConfig( map, crs, settings );
+            return map;
         }
     }
 

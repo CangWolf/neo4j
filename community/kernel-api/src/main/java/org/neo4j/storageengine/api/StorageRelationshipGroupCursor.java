@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -19,14 +19,9 @@
  */
 package org.neo4j.storageengine.api;
 
-public interface StorageRelationshipGroupCursor extends AutoCloseable
+public interface StorageRelationshipGroupCursor extends StorageCursor
 {
-    boolean next();
-
     void setCurrent( int groupReference, int firstOut, int firstIn, int firstLoop );
-
-    @Override
-    void close();
 
     int type();
 
@@ -50,8 +45,6 @@ public interface StorageRelationshipGroupCursor extends AutoCloseable
      * @return reference to a starting point for outgoing relationships with this type. Can be passed into {@link #init(long, long)} at a later point.
      */
     long loopsReference();
-
-    void release();
 
     long getOwningNode();
 

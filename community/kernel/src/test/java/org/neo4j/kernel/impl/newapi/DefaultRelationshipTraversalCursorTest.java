@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -380,12 +380,12 @@ public class DefaultRelationshipTraversalCursorTest
             }
 
             @Override
-            public void close()
+            public void reset()
             {
             }
 
             @Override
-            public void release()
+            public void close()
             {
             }
         };

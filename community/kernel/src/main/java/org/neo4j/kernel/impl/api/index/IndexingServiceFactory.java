@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -27,7 +27,7 @@ import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingController;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingControllerFactory;
 import org.neo4j.logging.LogProvider;
 import org.neo4j.scheduler.JobScheduler;
-import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
+import org.neo4j.storageengine.api.schema.SchemaRule;
 
 /**
  * Factory to create {@link IndexingService}
@@ -43,7 +43,7 @@ public class IndexingServiceFactory
                                           IndexProviderMap providerMap,
                                           IndexStoreView storeView,
                                           TokenNameLookup tokenNameLookup,
-                                          Iterable<StoreIndexDescriptor> indexRules,
+                                          Iterable<SchemaRule> schemaRules,
                                           LogProvider internalLogProvider,
                                           LogProvider userLogProvider,
                                           IndexingService.Monitor monitor,
@@ -58,7 +58,7 @@ public class IndexingServiceFactory
         IndexProxyCreator proxySetup =
                 new IndexProxyCreator( samplingConfig, storeView, providerMap, tokenNameLookup, internalLogProvider );
 
-        return new IndexingService( proxySetup, providerMap, indexMapRef, storeView, indexRules,
+        return new IndexingService( proxySetup, providerMap, indexMapRef, storeView, schemaRules,
                 indexSamplingController, tokenNameLookup, scheduler, schemaState,
                 multiPopulatorFactory, internalLogProvider, userLogProvider, monitor );
     }

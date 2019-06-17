@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -24,11 +24,11 @@ import org.neo4j.cypher.internal.compiler.v3_5.planner.logical.LeafPlansForVaria
 import org.neo4j.cypher.internal.compiler.v3_5.planner.logical.ordering.ResultOrdering
 import org.neo4j.cypher.internal.compiler.v3_5.planner.logical.plans._
 import org.neo4j.cypher.internal.compiler.v3_5.planner.logical.{LeafPlanFromExpression, LeafPlanner, LeafPlansForVariable, LogicalPlanningContext}
-import org.neo4j.cypher.internal.ir.v3_5.{ProvidedOrder, QueryGraph, InterestingOrder}
-import org.neo4j.cypher.internal.v3_5.logical.plans
-import org.neo4j.cypher.internal.v3_5.logical.plans._
+import org.neo4j.cypher.internal.ir.v3_5.{InterestingOrder, ProvidedOrder, QueryGraph}
 import org.neo4j.cypher.internal.v3_5.ast._
 import org.neo4j.cypher.internal.v3_5.expressions._
+import org.neo4j.cypher.internal.v3_5.logical.plans
+import org.neo4j.cypher.internal.v3_5.logical.plans._
 import org.neo4j.cypher.internal.v3_5.util.symbols._
 
 object indexScanLeafPlanner extends LeafPlanner with LeafPlanFromExpression {
@@ -53,7 +53,7 @@ object indexScanLeafPlanner extends LeafPlanner with LeafPlanFromExpression {
         maybeLeafPlans(name, plans)
 
       // MATCH (n:User) WHERE exists(n.prop) RETURN n
-      case predicate@AsPropertyScannable(scannable) =>
+      case AsPropertyScannable(scannable) =>
         val name = scannable.name
         val propertyKeyName = scannable.propertyKey.name
 

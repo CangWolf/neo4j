@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -65,6 +65,15 @@ class TreeZipperTest extends CypherFunSuite {
       .left.tap { _.elem should equal(Some(child3)) }
       .left.tap { _.elem should equal(Some(child2)) }
       .left.tap { _.elem should equal(Some(child1)) }
+  }
+
+  test("Can get and change left list") {
+    val elem = root.location.down.right.right.get //child3
+    elem.leftList should equal(List(child2, child1))
+
+    val elemWithNewLeft = elem.replaceLeftList(List(child4, child2))
+    elemWithNewLeft.leftList should equal(List(child4, child2))
+    elemWithNewLeft.right.leftList should equal(Some(List(child3, child4, child2)))
   }
 
   test("Correctly infers tree structure") {

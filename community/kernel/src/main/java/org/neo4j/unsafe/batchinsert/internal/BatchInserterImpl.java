@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
 import java.util.function.LongFunction;
 
 import org.neo4j.collection.PrimitiveLongCollections;
@@ -54,6 +55,7 @@ import org.neo4j.internal.kernel.api.InternalIndexState;
 import org.neo4j.internal.kernel.api.NamedToken;
 import org.neo4j.internal.kernel.api.exceptions.KernelException;
 import org.neo4j.internal.kernel.api.exceptions.schema.IndexNotFoundKernelException;
+import org.neo4j.internal.kernel.api.exceptions.schema.MisconfiguredIndexException;
 import org.neo4j.internal.kernel.api.schema.IndexProviderDescriptor;
 import org.neo4j.internal.kernel.api.schema.LabelSchemaDescriptor;
 import org.neo4j.io.fs.FileSystemAbstraction;
@@ -72,7 +74,7 @@ import org.neo4j.kernel.api.schema.constraints.IndexBackedConstraintDescriptor;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.extension.DatabaseKernelExtensions;
 import org.neo4j.kernel.extension.KernelExtensionFactory;
-import org.neo4j.kernel.extension.UnsatisfiedDependencyStrategies;
+import org.neo4j.kernel.extension.KernelExtensionFailureStrategies;
 import org.neo4j.kernel.impl.api.DatabaseSchemaState;
 import org.neo4j.kernel.impl.api.NonTransactionalTokenNameLookup;
 import org.neo4j.kernel.impl.api.index.IndexProviderMap;
@@ -158,6 +160,7 @@ import org.neo4j.logging.LogProvider;
 import org.neo4j.logging.NullLog;
 import org.neo4j.logging.internal.StoreLogService;
 import org.neo4j.scheduler.JobScheduler;
+import org.neo4j.storageengine.api.schema.IndexDescriptor;
 import org.neo4j.storageengine.api.schema.IndexDescriptorFactory;
 import org.neo4j.storageengine.api.schema.SchemaRule;
 import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
@@ -303,11 +306,12 @@ public class BatchInserterImpl implements BatchInserter, IndexConfigStoreProvide
         storeIndexStoreView = new NeoStoreIndexStoreView( NO_LOCK_SERVICE, neoStores );
         Dependencies deps = new Dependencies();
         Monitors monitors = new Monitors();
+//<<<<<<< HEAD
         deps.satisfyDependencies( fileSystem, config, logService, storeIndexStoreView, pageCache, monitors, RecoveryCleanupWorkCollector.immediate() );
 
         DatabaseKernelExtensions extensions = life.add( new DatabaseKernelExtensions(
                 new SimpleKernelContext( databaseDirectory, DatabaseInfo.TOOL, deps ),
-                kernelExtensions, deps, UnsatisfiedDependencyStrategies.ignore() ) );
+                kernelExtensions, deps, KernelExtensionFailureStrategies.ignore() ) );
 
         indexProviderMap = life.add( new DefaultIndexProviderMap( extensions, config ) );
 
@@ -486,8 +490,19 @@ public class BatchInserterImpl implements BatchInserter, IndexConfigStoreProvide
     private IndexReference createIndex( int labelId, int[] propertyKeyIds, Optional<String> indexName )
     {
         LabelSchemaDescriptor schema = SchemaDescriptorFactory.forLabel( labelId, propertyKeyIds );
-        IndexProviderDescriptor providerDescriptor = indexProviderMap.getDefaultProvider().getProviderDescriptor();
-        StoreIndexDescriptor schemaRule = IndexDescriptorFactory.forSchema( schema, indexName, providerDescriptor ).withId( schemaStore.nextId() );
+        IndexProvider provider = indexProviderMap.getDefaultProvider();
+        IndexProviderDescriptor providerDescriptor = provider.getProviderDescriptor();
+        IndexDescriptor index = IndexDescriptorFactory.forSchema( schema, indexName, providerDescriptor );
+        StoreIndexDescriptor schemaRule;
+        try
+        {
+            schemaRule = provider.bless( index ).withId( schemaStore.nextId() );
+        }
+        catch ( MisconfiguredIndexException e )
+        {
+            throw new ConstraintViolationException(
+                    "Unable to create index. The index configuration was refused by the '" + providerDescriptor + "' index provider.", e );
+        }
 
         for ( DynamicRecord record : schemaStore.allocateFrom( schemaRule ) )
         {
@@ -517,7 +532,7 @@ public class BatchInserterImpl implements BatchInserter, IndexConfigStoreProvide
                 IndexProxy indexProxy = getIndexProxy( indexingService, descriptor );
                 try
                 {
-                    indexProxy.awaitStoreScanCompleted();
+                    indexProxy.awaitStoreScanCompleted( 0, TimeUnit.MILLISECONDS );
                 }
                 catch ( IndexPopulationFailedKernelException e )
                 {
@@ -588,8 +603,19 @@ public class BatchInserterImpl implements BatchInserter, IndexConfigStoreProvide
         long indexId = schemaStore.nextId();
         long constraintRuleId = schemaStore.nextId();
 
-        IndexProviderDescriptor providerDescriptor = this.indexProviderMap.getDefaultProvider().getProviderDescriptor();
-        StoreIndexDescriptor storeIndexDescriptor = IndexDescriptorFactory.uniqueForSchema( schema, providerDescriptor ).withIds( indexId, constraintRuleId );
+        IndexProvider provider = indexProviderMap.getDefaultProvider();
+        IndexProviderDescriptor providerDescriptor = provider.getProviderDescriptor();
+        IndexDescriptor index = IndexDescriptorFactory.uniqueForSchema( schema, providerDescriptor );
+        StoreIndexDescriptor storeIndexDescriptor;
+        try
+        {
+            storeIndexDescriptor = provider.bless( index ).withIds( indexId, constraintRuleId );
+        }
+        catch ( MisconfiguredIndexException e )
+        {
+            throw new ConstraintViolationException(
+                    "Unable to create index. The index configuration was refused by the '" + providerDescriptor + "' index provider.", e );
+        }
 
         ConstraintRule constraintRule = ConstraintRule.constraintRule( constraintRuleId, constraintDescriptor, indexId );
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -151,7 +151,7 @@ public class DefaultPropertyCursor implements PropertyCursor
             txStateChangedProperties = null;
             txStateValue = null;
             read = null;
-            storeCursor.close();
+            storeCursor.reset();
 
             pool.accept( this );
         }
@@ -315,6 +315,6 @@ public class DefaultPropertyCursor implements PropertyCursor
 
     public void release()
     {
-        storeCursor.release();
+        storeCursor.close();
     }
 }

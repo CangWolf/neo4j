@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -143,7 +143,7 @@ class DefaultRelationshipGroupCursor implements RelationshipGroupCursor
         if ( !isClosed() )
         {
             read = null;
-            storeCursor.close();
+            storeCursor.reset();
 
             if ( pool != null )
             {
@@ -246,6 +246,6 @@ class DefaultRelationshipGroupCursor implements RelationshipGroupCursor
 
     public void release()
     {
-        storeCursor.release();
+        storeCursor.close();
     }
 }

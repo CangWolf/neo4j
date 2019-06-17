@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -78,10 +78,10 @@ import static org.neo4j.kernel.configuration.Settings.min;
 import static org.neo4j.kernel.configuration.Settings.optionsIgnoreCase;
 import static org.neo4j.kernel.configuration.Settings.optionsObeyCase;
 import static org.neo4j.kernel.configuration.Settings.pathSetting;
+import static org.neo4j.kernel.configuration.Settings.powerOf2;
 import static org.neo4j.kernel.configuration.Settings.range;
 import static org.neo4j.kernel.configuration.Settings.setting;
 import static org.neo4j.kernel.configuration.ssl.LegacySslPolicyConfig.LEGACY_POLICY_NAME;
-import static org.neo4j.util.Preconditions.checkArgument;
 
 /**
  * Settings for Neo4j.
@@ -111,7 +111,11 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<File> neo4j_home =
             setting( "unsupported.dbms.directories.neo4j_home", PATH, NO_DEFAULT );
 
+    /**
+     * @deprecated This setting is deprecated and will be removed in 4.0.
+     */
     @Description( "Name of the database to load" )
+    @Deprecated
     public static final Setting<String> active_database =
             buildSetting( "dbms.active_database", STRING, DEFAULT_DATABASE_NAME ).constraint( except( SYSTEM_DATABASE_NAME ) ).build();
 
@@ -123,7 +127,11 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<File> databases_root_path = derivedSetting( "unsupported.dbms.directories.databases.root",
             data_directory,  data -> new File( data, "databases" ), PATH );
 
+    /**
+     * @deprecated This setting is deprecated and will be removed in 4.0.
+     */
     @Internal
+    @Deprecated
     public static final Setting<File> database_path = derivedSetting( "unsupported.dbms.directories.database",
             databases_root_path, active_database, ( parent, child ) -> new File( parent, child ), PATH );
 
@@ -351,8 +359,11 @@ public class GraphDatabaseSettings implements LoadableConfig
                   + "value to `false` will cause Neo4j to fail `LOAD CSV` clauses that load data from the file system." )
     public static final Setting<Boolean> allow_file_urls = setting( "dbms.security.allow_csv_import_from_file_urls", BOOLEAN, TRUE );
 
-    @Description( "Sets the root directory for file URLs used with the Cypher `LOAD CSV` clause. This must be set to a single "
-                  + "directory, restricting access to only those files within that directory and its subdirectories." )
+    @Description( "Sets the root directory for file URLs used with the Cypher `LOAD CSV` clause. This should be set to a " +
+                  "directory relative to the Neo4j installation path, restricting access to only those files within that directory " +
+                  "and its subdirectories. For example the value \"import\" will only enable access to files within the 'import' folder. " +
+                  "Removing this setting will disable the security feature, allowing all files in the local system to be imported. " +
+                  "Setting this to an empty field will allow access to all files within the Neo4j installation folder." )
     public static final Setting<File> load_csv_file_url_root = pathSetting( "dbms.directories.import", NO_DEFAULT );
 
     @Description( "Selects whether to conform to the standard https://tools.ietf.org/html/rfc4180 for interpreting " +
@@ -402,6 +413,29 @@ public class GraphDatabaseSettings implements LoadableConfig
     @Internal
     public static final Setting<Integer> cypher_worker_count =
             setting( "unsupported.cypher.number_of_workers", INTEGER, "0" );
+
+    @Description( "Max number of recent queries to collect in the data collector module. Will round down to the" +
+            " nearest power of two. The default number (8192 query invocations) " +
+            " was chosen as a trade-off between getting a useful amount of queries, and not" +
+            " wasting too much heap. Even with a buffer full of unique queries, the estimated" +
+            " footprint lies in tens of MBs. If the buffer is full of cached queries, the" +
+            " retained size was measured to 265 kB. Setting this to 0 will disable data collection" +
+            " of queries completely." )
+    @Internal
+    public static final Setting<Integer> data_collector_max_recent_query_count =
+            buildSetting( "unsupported.datacollector.max_recent_query_count", INTEGER, "8192" )
+                    .constraint( min( 0 ) ).build();
+
+    @Description( "Sets the upper limit for how much of the query text that will be retained by the query collector." +
+            " For queries longer than the limit, only a prefix of size limit will be retained by the collector." +
+            " Lowering this value will reduce the memory footprint of collected query invocations under loads with" +
+            " many queries with long query texts, which could occur for generated queries. The downside is that" +
+            " on retrieving queries by `db.stats.retrieve`, queries longer than this max size would be returned" +
+            " incomplete. Setting this to 0 will completely drop query texts from the collected queries." )
+    @Internal
+    public static final Setting<Integer> data_collector_max_query_text_size =
+            buildSetting( "unsupported.datacollector.max_query_text_size", INTEGER, "10000" )
+                    .constraint( min( 0 ) ).build();
 
     @Description( "The maximum amount of time to wait for the database to become available, when " +
                   "starting a new transaction." )
@@ -1082,11 +1116,7 @@ public class GraphDatabaseSettings implements LoadableConfig
     public static final Setting<Long> tx_state_off_heap_max_cacheable_block_size = buildSetting(
             "dbms.tx_state.off_heap.max_cacheable_block_size", BYTES, "512k" )
             .constraint( min( kibiBytes( 4 ) ) )
-            .constraint( ( x, ignore ) ->
-            {
-                checkArgument( Long.bitCount( x ) == 1, "Value must be a power of 2: %d", x );
-                return x;
-            } )
+            .constraint( powerOf2() )
             .build();
 
     @Description( "Defines the size of the off-heap memory blocks cache. The cache will contain this number of blocks for each block size " +

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -38,6 +38,8 @@ sealed trait SetOperation {
   def name: String
 
   def needsExclusiveLock: Boolean
+
+  def registerOwningPipe(pipe: Pipe): Unit
 }
 
 object SetOperation {
@@ -111,6 +113,8 @@ abstract class SetEntityPropertyOperation[T](itemName: String, propertyKey: Lazy
       val ops = operations(state.query)
       if (needsExclusiveLock) ops.acquireExclusiveLock(itemId)
 
+      invalidateCachedProperties(executionContext, itemId)
+
       try {
         setProperty[T](executionContext, state, ops, itemId, propertyKey, expression)
       } finally if (needsExclusiveLock) ops.releaseExclusiveLock(itemId)
@@ -120,6 +124,10 @@ abstract class SetEntityPropertyOperation[T](itemName: String, propertyKey: Lazy
   protected def id(item: Any): Long
 
   protected def operations(qtx: QueryContext): Operations[T]
+
+  protected def invalidateCachedProperties(executionContext: ExecutionContext, id: Long): Unit
+
+  override def registerOwningPipe(pipe: Pipe): Unit = expression.registerOwningPipe(pipe)
 }
 
 case class SetNodePropertyOperation(nodeName: String, propertyKey: LazyPropertyKey,
@@ -131,6 +139,9 @@ case class SetNodePropertyOperation(nodeName: String, propertyKey: LazyPropertyK
   override protected def id(item: Any) = CastSupport.castOrFail[VirtualNodeValue](item).id()
 
   override protected def operations(qtx: QueryContext) = qtx.nodeOps
+
+  override protected def invalidateCachedProperties(executionContext: ExecutionContext, id: Long): Unit =
+    executionContext.invalidateCachedProperties(id)
 }
 
 case class SetRelationshipPropertyOperation(relName: String, propertyKey: LazyPropertyKey,
@@ -142,6 +153,8 @@ case class SetRelationshipPropertyOperation(relName: String, propertyKey: LazyPr
   override protected def id(item: Any) = CastSupport.castOrFail[VirtualRelationshipValue](item).id()
 
   override protected def operations(qtx: QueryContext) = qtx.relationshipOps
+
+  override protected def invalidateCachedProperties(executionContext: ExecutionContext, id: Long): Unit = {} // we do not cache relationships
 }
 
 case class SetPropertyOperation(entityExpr: Expression, propertyKey: LazyPropertyKey, expression: Expression)
@@ -168,6 +181,11 @@ case class SetPropertyOperation(entityExpr: Expression, propertyKey: LazyPropert
   }
 
   override def needsExclusiveLock = true
+
+  override def registerOwningPipe(pipe: Pipe): Unit = {
+    entityExpr.registerOwningPipe(pipe)
+    expression.registerOwningPipe(pipe)
+  }
 }
 
 abstract class SetPropertyFromMapOperation[T](itemName: String, expression: Expression,
@@ -211,6 +229,8 @@ abstract class SetPropertyFromMapOperation[T](itemName: String, expression: Expr
       }
     }
   }
+
+  override def registerOwningPipe(pipe: Pipe): Unit = expression.registerOwningPipe(pipe)
 }
 
 case class SetNodePropertyFromMapOperation(nodeName: String, expression: Expression,
@@ -249,4 +269,6 @@ case class SetLabelsOperation(nodeName: String, labels: Seq[LazyLabel]) extends 
   override def name = "SetLabels"
 
   override def needsExclusiveLock = false
+
+  override def registerOwningPipe(pipe: Pipe): Unit = ()
 }

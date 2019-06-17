@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -176,7 +176,7 @@ public abstract class KernelIntegrationTest
 
     protected GraphDatabaseService createGraphDatabase()
     {
-        GraphDatabaseBuilder graphDatabaseBuilder = createGraphDatabaseFactory()
+        GraphDatabaseBuilder graphDatabaseBuilder = configure( createGraphDatabaseFactory() )
                 .setFileSystem( fileSystemRule.get() )
                 .newEmbeddedDatabaseBuilder( testDir.storeDir() );
         return configure( graphDatabaseBuilder ).newGraphDatabase();
@@ -190,6 +190,11 @@ public abstract class KernelIntegrationTest
     protected GraphDatabaseBuilder configure( GraphDatabaseBuilder graphDatabaseBuilder )
     {
         return graphDatabaseBuilder;
+    }
+
+    protected TestGraphDatabaseFactory configure( TestGraphDatabaseFactory factory )
+    {
+        return factory;
     }
 
     void dbWithNoCache() throws TransactionFailureException

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -64,6 +64,15 @@ public class RelationshipCountsProcessor implements RecordProcessor<Relationship
         this.itemsPerLabel = anyRelationshipType + 1;
         this.labelsCounts = cacheFactory.newLongArray( sideSize() * SIDES, 0 );
         this.wildcardCounts = cacheFactory.newLongArray( anyRelationshipType + 1, 0 );
+    }
+
+    static long calculateMemoryUsage( int highLabelId, int highRelationshipTypeId )
+    {
+        int labels = highLabelId + 1;
+        int types = highRelationshipTypeId + 1;
+        long labelsCountsUsage = labels * types * SIDES * Long.BYTES;
+        long wildcardCountsUsage = types * Long.BYTES;
+        return labelsCountsUsage + wildcardCountsUsage;
     }
 
     @Override

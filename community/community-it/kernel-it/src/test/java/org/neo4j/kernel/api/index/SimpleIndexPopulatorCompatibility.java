@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -38,6 +38,7 @@ import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.schema.index.TestIndexDescriptorFactory;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.index.IndexUpdateMode;
+import org.neo4j.kernel.impl.api.index.PhaseTracker;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingConfig;
 import org.neo4j.kernel.impl.index.schema.NodeValueIterator;
 import org.neo4j.storageengine.api.schema.IndexDescriptor;
@@ -304,6 +305,7 @@ public class SimpleIndexPopulatorCompatibility extends IndexProviderCompatibilit
                     TestNodePropertyAccessor propertyAccessor =
                             new TestNodePropertyAccessor( nodeId1, descriptor.schema(), value );
                     propertyAccessor.addNode( nodeId2, descriptor.schema(), value );
+                    p.scanCompleted( PhaseTracker.nullInstance );
                     p.verifyDeferredConstraints( propertyAccessor );
 
                     fail( "expected exception" );
@@ -324,7 +326,7 @@ public class SimpleIndexPopulatorCompatibility extends IndexProviderCompatibilit
                         throw e;
                     }
                 }
-            } );
+            }, false );
         }
     }
 }

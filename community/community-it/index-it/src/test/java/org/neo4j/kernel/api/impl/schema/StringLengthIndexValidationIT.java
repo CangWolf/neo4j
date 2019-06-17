@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -123,7 +123,9 @@ public class StringLengthIndexValidationIT
         }
         catch ( IllegalStateException e )
         {
-            assertThat( e.getMessage(), Matchers.containsString( "Index entered a FAILED state." ) );
+            assertThat( e.getMessage(), Matchers.containsString(
+                    "Index IndexDefinition[label:LABEL_ONE on:largeString] (IndexRule[id=1, descriptor=Index( GENERAL, :label[0](property[0]) ), " +
+                            "provider={key=lucene+native, version=2.0}]) entered a FAILED state." ) );
         }
 
         // Index should be in failed state

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -61,6 +61,9 @@ case class PreParsedQuery(statement: String,
 
     s"CYPHER ${version.name} $plannerInfo $runtimeInfo $updateStrategyInfo $expressionEngineInfo $debugFlags $statement"
   }
+
+  def rawPreparserOptions: String =
+    rawStatement.take(rawStatement.length - statement.length)
 
   def useCompiledExpressions: Boolean = expressionEngine == CypherExpressionEngineOption.compiled ||
     (expressionEngine == CypherExpressionEngineOption.onlyWhenHot && recompilationLimitReached)

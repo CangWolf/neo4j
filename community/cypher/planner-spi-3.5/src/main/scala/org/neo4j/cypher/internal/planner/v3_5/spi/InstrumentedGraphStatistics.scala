@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -48,8 +48,7 @@ case class GraphStatisticsSnapshot(statsValues: Map[StatisticsKey, Double] = Map
       case NodesWithLabelCardinality(labelId) =>
         instrumented.nodesWithLabelCardinality(labelId)
       case NodesAllCardinality =>
-        val value = statsValues.getOrElse(NodesAllCardinality, 1.0)
-        snapshot.map.put(NodesAllCardinality, value) // Copy the old value, otherwise every create would lead to a diverged cache if we update this
+        instrumented.nodesAllCardinality()
       case CardinalityByLabelsAndRelationshipType(lhs, relType, rhs) =>
         instrumented.cardinalityByLabelsAndRelationshipType(lhs, relType, rhs)
       case IndexSelectivity(index) =>

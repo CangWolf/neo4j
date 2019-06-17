@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -24,8 +24,8 @@ import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
 import org.neo4j.cypher.internal.compiler.v3_5.planner.LogicalPlanningTestSupport
 import org.neo4j.cypher.internal.ir.v3_5.InterestingOrder
-import org.neo4j.cypher.internal.v3_5.logical.plans.{AllNodesScan, LogicalPlan, NestedPlanExpression, Selection}
 import org.neo4j.cypher.internal.v3_5.expressions._
+import org.neo4j.cypher.internal.v3_5.logical.plans.{AllNodesScan, LogicalPlan, NestedPlanExpression, Selection}
 import org.neo4j.cypher.internal.v3_5.rewriting.rewriters.PatternExpressionPatternElementNamer
 import org.neo4j.cypher.internal.v3_5.util.test_helpers.CypherFunSuite
 
@@ -37,7 +37,7 @@ class patternExpressionRewriterTest extends CypherFunSuite with LogicalPlanningT
     // given
     val expr: Expression = And(patExpr1, patExpr2)_
     val strategy = createStrategy
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext, strategy = strategy)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext(), strategy = strategy)
     val rewriter = patternExpressionRewriter(Set.empty, InterestingOrder.empty, context)
 
     // when
@@ -53,7 +53,7 @@ class patternExpressionRewriterTest extends CypherFunSuite with LogicalPlanningT
     // given
     val expr: Expression = Or(And(patExpr1, NestedPlanExpression(dummyPlan, patExpr2)_)_, patExpr3)_
     val strategy = createStrategy
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext, strategy = strategy)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext(), strategy = strategy)
     val rewriter = patternExpressionRewriter(Set.empty, InterestingOrder.empty, context)
 
     // when
@@ -70,7 +70,7 @@ class patternExpressionRewriterTest extends CypherFunSuite with LogicalPlanningT
     val plan = Selection(Seq(patExpr3), dummyPlan)
     val expr: Expression = Or(And(patExpr1, NestedPlanExpression(plan, patExpr2)_)_, patExpr4)_
     val strategy = createStrategy
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext, strategy = strategy)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext(), strategy = strategy)
     val rewriter = patternExpressionRewriter(Set.empty, InterestingOrder.empty, context)
 
     // when

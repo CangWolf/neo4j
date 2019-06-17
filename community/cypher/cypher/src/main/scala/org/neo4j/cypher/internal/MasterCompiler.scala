@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -47,10 +47,7 @@ object MasterCompiler {
 /**
   * Selects the correct cypher implementation based on a pre-parsed query.
   */
-class MasterCompiler(graph: GraphDatabaseQueryService,
-                     kernelMonitors: KernelMonitors,
-                     config: CypherConfiguration,
-                     logProvider: LogProvider,
+class MasterCompiler(config: CypherConfiguration,
                      compilerLibrary: CompilerLibrary) {
 
   /**

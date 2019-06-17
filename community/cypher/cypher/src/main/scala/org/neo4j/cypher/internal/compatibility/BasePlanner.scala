@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -84,9 +84,9 @@ abstract class BasePlanner[STATEMENT <: AnyRef, PARSED_STATE <: AnyRef](
       .isDefinedAt(logicalPlanState.maybeLogicalPlan.get))
       FineToReuse
     else {
-      val fp = PlanFingerprint.take(clock, planContext.txIdProvider, planContext.statistics)
-      val fingerprint = new PlanFingerprintReference(fp)
-      MaybeReusable(fingerprint)
+      val fingerprint = PlanFingerprint.take(clock, planContext.txIdProvider, planContext.statistics)
+      val fingerprintReference = new PlanFingerprintReference(fingerprint)
+      MaybeReusable(fingerprintReference)
     }
   }
 }

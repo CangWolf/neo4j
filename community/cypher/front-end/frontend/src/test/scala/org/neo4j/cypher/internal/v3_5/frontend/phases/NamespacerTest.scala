@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -152,6 +152,11 @@ class NamespacerTest extends CypherFunSuite with AstConstructionTestSupport with
       "WITH 1 AS foo FOREACH (bar IN [1,2,3] | CREATE (c)) RETURN foo as bar ORDER BY bar + 2",
       "WITH 1 AS foo FOREACH (`  bar@23` IN [1,2,3] | CREATE (c)) RETURN foo as bar ORDER BY bar + 2",
       List(varFor("  bar@23"))
+    ),
+    TestCase(
+      "MATCH (a) WITH a.name AS n ORDER BY a.foo MATCH (a) RETURN a.age",
+      "MATCH (`  a@7`) WITH `  a@7`.name as n ORDER BY `  a@7`.foo MATCH (`  a@49`) RETURN `  a@49`.age AS `a.age`",
+      List(varFor("  a@7"), varFor("  a@49"))
     )
   )
 

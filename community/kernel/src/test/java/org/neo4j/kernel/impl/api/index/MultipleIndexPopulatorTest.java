@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -39,12 +39,12 @@ import org.neo4j.kernel.api.exceptions.index.IndexEntryConflictException;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexPopulator;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
 import org.neo4j.kernel.api.schema.SchemaDescriptorFactory;
 import org.neo4j.kernel.api.schema.index.TestIndexDescriptorFactory;
 import org.neo4j.kernel.impl.api.SchemaState;
 import org.neo4j.kernel.impl.api.index.MultipleIndexPopulator.IndexPopulation;
 import org.neo4j.logging.LogProvider;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.schema.IndexSample;
 import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
 
@@ -71,10 +71,8 @@ import static org.neo4j.kernel.api.index.IndexQueryHelper.add;
 public class MultipleIndexPopulatorTest
 {
     private final LabelSchemaDescriptor index1 = SchemaDescriptorFactory.forLabel( 1, 1 );
-    @Mock
+    @Mock( answer = Answers.RETURNS_MOCKS )
     private IndexStoreView indexStoreView;
-    @Mock
-    private StoreScan storeScan;
     @Mock( answer = Answers.RETURNS_MOCKS )
     private LogProvider logProvider;
     @Mock
@@ -119,6 +117,18 @@ public class MultipleIndexPopulatorTest
         indexPopulation.cancel();
 
         verify( indexPopulation.populator, never() ).close( false );
+    }
+
+    @Test
+    public void cancelAndDropShouldCallDropOnPopulator() throws FlipFailedKernelException
+    {
+        IndexPopulator populator = createIndexPopulator();
+        IndexPopulation indexPopulation = addPopulator( populator, 1 );
+
+        indexPopulation.cancelAndDrop();
+
+        verify( populator, never() ).close( false );
+        verify( populator ).drop();
     }
 
     @Test

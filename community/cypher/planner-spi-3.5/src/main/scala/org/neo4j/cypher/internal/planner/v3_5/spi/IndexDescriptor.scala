@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -64,7 +64,8 @@ case class IndexDescriptor(label: LabelId,
                            properties: Seq[PropertyKeyId],
                            limitations: Set[IndexLimitation] = Set.empty[IndexLimitation],
                            orderCapability: OrderCapability = IndexDescriptor.noOrderCapability,
-                           valueCapability: ValueCapability = IndexDescriptor.noValueCapability) {
+                           valueCapability: ValueCapability = IndexDescriptor.noValueCapability,
+                           isUnique: Boolean = false) {
   val isComposite: Boolean = properties.length > 1
 
   def property: PropertyKeyId = if (isComposite) throw new IllegalArgumentException("Cannot get single property of multi-property index") else properties.head

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -52,7 +52,7 @@ import org.neo4j.kernel.api.txstate.TransactionState;
 import org.neo4j.kernel.configuration.Config;
 import org.neo4j.kernel.impl.api.KernelTransactionImplementation;
 import org.neo4j.kernel.impl.api.SchemaState;
-import org.neo4j.kernel.impl.api.index.IndexingProvidersService;
+import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.api.state.TxState;
 import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
@@ -140,7 +140,7 @@ public class OperationsLockTest
         constraintIndexCreator = mock( ConstraintIndexCreator.class );
         operations = new Operations( allStoreHolder, mock( IndexTxStateUpdater.class ),storageReader,
                  transaction, new KernelToken( storageReader, transaction, mockedTokenHolders() ), cursors, autoindexing,
-                constraintIndexCreator, mock( ConstraintSemantics.class ), mock( IndexingProvidersService.class ), Config.defaults() );
+                constraintIndexCreator, mock( ConstraintSemantics.class ), mock( IndexingService.class ), Config.defaults() );
         operations.initialize();
 
         this.order = inOrder( locks, txState, storageReader );
@@ -301,6 +301,32 @@ public class OperationsLockTest
 
         // then
         order.verify( locks ).acquireExclusive( LockTracer.NONE, ResourceTypes.NODE, 123 );
+        order.verify( txState ).nodeDoAddProperty( 123, propertyKeyId, value );
+    }
+
+    @Test
+    public void shouldAcquireSchemaReadLockBeforeSettingPropertyOnNode() throws Exception
+    {
+        // given
+        int relatedLabelId = 50;
+        int unrelatedLabelId = 51;
+        int propertyKeyId = 8;
+        when( nodeCursor.next() ).thenReturn( true );
+        LabelSet labelSet = mock( LabelSet.class );
+        when( labelSet.all() ).thenReturn( new long[]{relatedLabelId} );
+        when( nodeCursor.labels() ).thenReturn( labelSet );
+        Value value = Values.of( 9 );
+        when( propertyCursor.next() ).thenReturn( true );
+        when( propertyCursor.propertyKey() ).thenReturn( propertyKeyId );
+        when( propertyCursor.propertyValue() ).thenReturn( NO_VALUE );
+
+        // when
+        operations.nodeSetProperty( 123, propertyKeyId, value );
+
+        // then
+        order.verify( locks ).acquireExclusive( LockTracer.NONE, ResourceTypes.NODE, 123 );
+        order.verify( locks ).acquireShared( LockTracer.NONE, ResourceTypes.LABEL, relatedLabelId );
+        order.verify( locks, never() ).acquireShared( LockTracer.NONE, ResourceTypes.LABEL, unrelatedLabelId );
         order.verify( txState ).nodeDoAddProperty( 123, propertyKeyId, value );
     }
 
@@ -498,7 +524,7 @@ public class OperationsLockTest
     {
         long nodeId = 1L;
         returnRelationships( transaction, false, new TestRelationshipChain( nodeId ) );
-        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ) );
+        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ).withNode( nodeId ) );
         when( nodeCursor.next() ).thenReturn( true );
         LabelSet labels = mock( LabelSet.class );
         when( labels.all() ).thenReturn( EMPTY_LONG_ARRAY );
@@ -517,7 +543,7 @@ public class OperationsLockTest
         long nodeId = 1L;
         returnRelationships( transaction, false,
                 new TestRelationshipChain( nodeId ).outgoing( 1, 2L, 42 ) );
-        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ) );
+        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ).withNode( nodeId ) );
         LabelSet labels = mock( LabelSet.class );
         when( labels.all() ).thenReturn( EMPTY_LONG_ARRAY );
         when( nodeCursor.labels() ).thenReturn( labels );
@@ -563,7 +589,7 @@ public class OperationsLockTest
         long labelId2 = 2;
 
         returnRelationships( transaction, false, new TestRelationshipChain( nodeId ) );
-        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ) );
+        when( transaction.ambientNodeCursor() ).thenReturn( new StubNodeCursor( false ).withNode( nodeId ) );
         when( nodeCursor.next() ).thenReturn( true );
         LabelSet labels = mock( LabelSet.class );
         when( labels.all() ).thenReturn( new long[]{labelId1, labelId2} );

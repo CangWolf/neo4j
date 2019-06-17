@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -52,6 +52,7 @@ import org.neo4j.internal.kernel.api.exceptions.InvalidTransactionTypeKernelExce
 import org.neo4j.internal.kernel.api.exceptions.TransactionFailureException;
 import org.neo4j.internal.kernel.api.exceptions.schema.ConstraintValidationException;
 import org.neo4j.internal.kernel.api.exceptions.schema.CreateConstraintFailureException;
+import org.neo4j.internal.kernel.api.exceptions.schema.SchemaKernelException;
 import org.neo4j.internal.kernel.api.schema.SchemaDescriptor;
 import org.neo4j.internal.kernel.api.security.AccessMode;
 import org.neo4j.internal.kernel.api.security.AuthSubject;
@@ -72,7 +73,7 @@ import org.neo4j.kernel.api.txstate.auxiliary.AuxiliaryTransactionStateCloseExce
 import org.neo4j.kernel.api.txstate.auxiliary.AuxiliaryTransactionStateHolder;
 import org.neo4j.kernel.api.txstate.auxiliary.AuxiliaryTransactionStateManager;
 import org.neo4j.kernel.configuration.Config;
-import org.neo4j.kernel.impl.api.index.IndexingProvidersService;
+import org.neo4j.kernel.impl.api.index.IndexingService;
 import org.neo4j.kernel.impl.api.state.ConstraintIndexCreator;
 import org.neo4j.kernel.impl.api.state.TxState;
 import org.neo4j.kernel.impl.constraints.ConstraintSemantics;
@@ -155,7 +156,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
     // whereas others, such as timestamp or txId when transaction starts, even locks, needs to be set in #initialize().
     private TxState txState;
     private AuxiliaryTransactionStateHolder auxTxStateHolder;
-    private TransactionWriteState writeState;
+    private volatile TransactionWriteState writeState;
     private TransactionHooks.TransactionHooksState hooksState;
     private final KernelStatement currentStatement;
     private final List<CloseListener> closeListeners = new ArrayList<>( 2 );
@@ -198,7 +199,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
             LockTracer lockTracer, PageCursorTracerSupplier cursorTracerSupplier, StorageEngine storageEngine, AccessCapability accessCapability,
             AutoIndexing autoIndexing, ExplicitIndexStore explicitIndexStore, VersionContextSupplier versionContextSupplier,
             CollectionsFactorySupplier collectionsFactorySupplier, ConstraintSemantics constraintSemantics, SchemaState schemaState,
-            IndexingProvidersService indexProviders, TokenHolders tokenHolders, Dependencies dataSourceDependencies )
+            IndexingService indexingService, TokenHolders tokenHolders, Dependencies dataSourceDependencies )
     {
         this.schemaWriteGuard = schemaWriteGuard;
         this.hooks = hooks;
@@ -228,14 +229,14 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         this.operations =
                 new Operations(
                         allStoreHolder,
-                        new IndexTxStateUpdater( storageReader, allStoreHolder, indexProviders ), storageReader,
+                        new IndexTxStateUpdater( allStoreHolder, indexingService ), storageReader,
                         this,
                         new KernelToken( storageReader, this, tokenHolders ),
                         cursors,
                         autoIndexing,
                         constraintIndexCreator,
                         constraintSemantics,
-                        indexProviders,
+                        indexingService,
                         config );
         this.collectionsFactory = collectionsFactorySupplier.create();
     }
@@ -351,6 +352,12 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         }
     }
 
+    @Override
+    public boolean isSchemaTransaction()
+    {
+        return writeState == TransactionWriteState.SCHEMA;
+    }
+
     private boolean markForTerminationIfPossible( Status reason )
     {
         if ( canBeTerminated() )
@@ -396,6 +403,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
         this.userMetaData = data;
     }
 
+    @Override
     public Map<String, Object> getMetaData()
     {
         return userMetaData;
@@ -410,7 +418,7 @@ public class KernelTransactionImplementation implements KernelTransaction, TxSta
     }
 
     @Override
-    public IndexDescriptor indexUniqueCreate( SchemaDescriptor schema, String provider )
+    public IndexDescriptor indexUniqueCreate( SchemaDescriptor schema, String provider ) throws SchemaKernelException
     {
         return operations.indexUniqueCreate( schema, provider );
     }

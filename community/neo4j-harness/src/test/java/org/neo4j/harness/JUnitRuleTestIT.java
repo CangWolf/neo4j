@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -119,13 +119,14 @@ public class JUnitRuleTestIT
     }
 
     @Test
-    public void shouldRuleWorkWithExistingDirectory()
+    public void shouldRuleWorkWithExistingDirectory() throws Throwable
     {
-        // given
+        // given a root folder, create /databases/graph.db folders.
+        File oldDir = testDirectory.directory( "old" );
+        File storeDir = Config.defaults( GraphDatabaseSettings.data_directory, oldDir.toPath().toString() )
+                .get( GraphDatabaseSettings.database_path );
+        GraphDatabaseService db = new TestGraphDatabaseFactory().newEmbeddedDatabase( storeDir );
 
-        GraphDatabaseService db = new TestGraphDatabaseFactory()
-                .newEmbeddedDatabaseBuilder( testDirectory.databaseDir() )
-                .newGraphDatabase();
         try
         {
             db.execute( "CREATE ()" );
@@ -136,22 +137,25 @@ public class JUnitRuleTestIT
         }
 
         // When a rule with an pre-populated graph db directory is used
-        final Neo4jRule ruleWithDirectory = new Neo4jRule( testDirectory.databaseDir() )
-                .copyFrom( testDirectory.databaseDir() );
-        ruleWithDirectory.apply( new Statement()
+        File newDir = testDirectory.directory( "new" );
+        final Neo4jRule ruleWithDirectory = new Neo4jRule( newDir )
+                .copyFrom( oldDir );
+        Statement statement = ruleWithDirectory.apply( new Statement()
         {
             @Override
             public void evaluate()
             {
                 // Then the database is not empty
-                Result result = ruleWithDirectory.getGraphDatabaseService()
-                        .execute( "MATCH (n) RETURN count(n) AS " + "count" );
+                Result result = ruleWithDirectory.getGraphDatabaseService().execute( "MATCH (n) RETURN count(n) AS " + "count" );
 
                 List<Object> column = Iterators.asList( result.columnAs( "count" ) );
                 assertEquals( 1, column.size() );
-                assertEquals( 1, column.get( 0 ) );
+                assertEquals( 1L, column.get( 0 ) );
             }
         }, null );
+
+        // Then
+        statement.evaluate();
     }
 
     @Test

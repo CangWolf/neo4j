@@ -1,35 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!--
-  Copyright (c) 2002-2018 "Neo4j,"
-  Neo4j Sweden AB [http://neo4j.com]
-
-  This file is part of Neo4j.
-
-  Neo4j is free software: you can redistribute it and/or modify
-  it under the terms of the GNU General Public License as published by
-  the Free Software Foundation, either version 3 of the License, or
-  (at your option) any later version.
-
-  This program is distributed in the hope that it will be useful,
-  but WITHOUT ANY WARRANTY; without even the implied warranty of
-  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-  GNU General Public License for more details.
-
-  You should have received a copy of the GNU General Public License
-  along with this program.  If not, see <http://www.gnu.org/licenses />.
-  -->
-
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <parent>
     <groupId>org.neo4j</groupId>
     <artifactId>parent</artifactId>
-    <version>3.5.1-SNAPSHOT</version>
+    <version>3.5.7-SNAPSHOT</version>
     <relativePath>../..</relativePath>
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
   <artifactId>neo4j-kernel</artifactId>
-  <version>3.5.1-SNAPSHOT</version>
+  <version>3.5.7-SNAPSHOT</version>
 
   <name>Neo4j - Graph Database Kernel</name>
   <description>
@@ -74,37 +54,12 @@ the relevant Commercial Agreement.
 
   <build>
     <plugins>
-      <!-- This module contains public API, run javadoc and revapi -->
-      <plugin>
-        <artifactId>maven-javadoc-plugin</artifactId>
-      </plugin>
+      <!-- This module contains public API, run revapi -->
       <plugin>
         <groupId>org.revapi</groupId>
         <artifactId>revapi-maven-plugin</artifactId>
       </plugin>
 
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-        <executions>
-          <execution>
-            <id>default-compile</id>
-            <configuration>
-              <compilerArgument>-proc:none</compilerArgument>
-              <includes>
-                <include>org/neo4j/kernel/impl/annotations/**</include>
-              </includes>
-            </configuration>
-          </execution>
-          <execution>
-            <id>compile-neo4j-kernel</id>
-            <phase>compile</phase>
-            <goals>
-              <goal>compile</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
       <plugin>
         <artifactId>maven-jar-plugin</artifactId>
         <configuration>
@@ -124,6 +79,11 @@ the relevant Commercial Agreement.
 
     <dependencies>
         <!-- main dependencies, internal -->
+      <dependency>
+        <groupId>org.neo4j</groupId>
+        <artifactId>neo4j-annotation-processors</artifactId>
+        <version>${project.version}</version>
+      </dependency>
         <dependency>
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-graphdb-api</artifactId>
@@ -173,6 +133,17 @@ the relevant Commercial Agreement.
             <groupId>org.neo4j</groupId>
             <artifactId>neo4j-lucene-upgrade</artifactId>
             <version>${project.version}</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <!--lucene should be included here to be able to produce correct licensing file-->
+        <dependency>
+            <groupId>org.apache.lucene</groupId>
+            <artifactId>lucene-core</artifactId>
         </dependency>
         <dependency>
             <groupId>org.neo4j</groupId>

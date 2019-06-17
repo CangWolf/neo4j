@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -50,7 +50,7 @@ case class AntiConditionalApply(left: LogicalPlan, right: LogicalPlan, items: Se
     * a null row when the node was not found. The RHS (MergeCreateNode) does not provide the property, but is supposed to
     * override all the null columns from the LHS.
     *
-    * Not making cached node properties available is the same thing to do, as long as this is only planned in such a way.
+    * Not making cached node properties available is the sane thing to do, as long as this is only planned in such a way.
     */
   override final def availableCachedNodeProperties: Map[Property, CachedNodeProperty] = Map.empty
 }

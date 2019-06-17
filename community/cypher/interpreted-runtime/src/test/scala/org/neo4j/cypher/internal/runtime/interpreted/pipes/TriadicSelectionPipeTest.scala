@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -193,7 +193,7 @@ class TriadicSelectionPipeTest extends CypherFunSuite {
             if (ValueUtils.of(m(keys(0))) == context(keys(0))) {
               val stringToProxy: mutable.Map[String, AnyValue] = collection.mutable.Map(m.mapValues(ValueUtils.of).toSeq: _*)
               val outRow = state.newExecutionContext(CommunityExecutionContextFactory())
-              outRow mergeWith ExecutionContext(stringToProxy)
+              outRow.mergeWith(ExecutionContext(stringToProxy), null)
               Some(outRow)
             }
             else None

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -60,7 +60,7 @@ public class KernelTransactionMonitor implements Runnable
             long transactionTimeoutMillis = activeTransaction.timeoutMillis();
             if ( transactionTimeoutMillis > 0 )
             {
-                if ( isTransactionExpired( activeTransaction, now, transactionTimeoutMillis ) )
+                if ( isTransactionExpired( activeTransaction, now, transactionTimeoutMillis ) && !activeTransaction.isSchemaTransaction() )
                 {
                     if ( activeTransaction.markForTermination( Status.Transaction.TransactionTimedOut ) )
                     {

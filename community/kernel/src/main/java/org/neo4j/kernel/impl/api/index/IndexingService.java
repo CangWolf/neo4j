@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -41,9 +41,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringJoiner;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import org.neo4j.collection.PrimitiveLongCollections;
 import org.neo4j.function.ThrowingConsumer;
 import org.neo4j.graphdb.ResourceIterator;
 import org.neo4j.graphdb.factory.GraphDatabaseSettings;
@@ -51,6 +53,7 @@ import org.neo4j.helpers.collection.Iterators;
 import org.neo4j.internal.kernel.api.InternalIndexState;
 import org.neo4j.internal.kernel.api.TokenNameLookup;
 import org.neo4j.internal.kernel.api.exceptions.schema.IndexNotFoundKernelException;
+import org.neo4j.internal.kernel.api.exceptions.schema.MisconfiguredIndexException;
 import org.neo4j.internal.kernel.api.schema.IndexProviderDescriptor;
 import org.neo4j.internal.kernel.api.schema.SchemaDescriptor;
 import org.neo4j.io.pagecache.IOLimiter;
@@ -62,11 +65,12 @@ import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexPopulator;
 import org.neo4j.kernel.api.index.IndexProvider;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
+import org.neo4j.kernel.api.schema.constraints.IndexBackedConstraintDescriptor;
 import org.neo4j.kernel.impl.api.SchemaState;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingController;
 import org.neo4j.kernel.impl.api.index.sampling.IndexSamplingMode;
 import org.neo4j.kernel.impl.store.UnderlyingStorageException;
+import org.neo4j.kernel.impl.store.record.ConstraintRule;
 import org.neo4j.kernel.impl.transaction.state.IndexUpdates;
 import org.neo4j.kernel.lifecycle.LifecycleAdapter;
 import org.neo4j.logging.Log;
@@ -75,7 +79,9 @@ import org.neo4j.register.Register.DoubleLongRegister;
 import org.neo4j.register.Registers;
 import org.neo4j.scheduler.JobScheduler;
 import org.neo4j.storageengine.api.EntityType;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.schema.IndexDescriptor;
+import org.neo4j.storageengine.api.schema.SchemaRule;
 import org.neo4j.storageengine.api.schema.StoreIndexDescriptor;
 import org.neo4j.values.storable.Value;
 
@@ -108,7 +114,7 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
     private final IndexStoreView storeView;
     private final IndexProviderMap providerMap;
     private final IndexMapReference indexMapRef;
-    private final Iterable<StoreIndexDescriptor> indexDescriptors;
+    private final Iterable<SchemaRule> schemaRules;
     private final Log internalLog;
     private final Log userLog;
     private final TokenNameLookup tokenNameLookup;
@@ -138,6 +144,8 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         void indexPopulationScanComplete();
 
         void awaitingPopulationOfRecoveredIndex( StoreIndexDescriptor descriptor );
+
+        void populationCancelled();
     }
 
     public static class MonitorAdapter implements Monitor
@@ -166,6 +174,11 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         public void awaitingPopulationOfRecoveredIndex( StoreIndexDescriptor descriptor )
         {   // Do nothing
         }
+
+        @Override
+        public void populationCancelled()
+        {   // Do nothing
+        }
     }
 
     public static final Monitor NO_MONITOR = new MonitorAdapter();
@@ -176,7 +189,7 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
             IndexProviderMap providerMap,
             IndexMapReference indexMapRef,
             IndexStoreView storeView,
-            Iterable<StoreIndexDescriptor> indexDescriptors,
+            Iterable<SchemaRule> schemaRules,
             IndexSamplingController samplingController,
             TokenNameLookup tokenNameLookup,
             JobScheduler scheduler,
@@ -190,7 +203,7 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         this.providerMap = providerMap;
         this.indexMapRef = indexMapRef;
         this.storeView = storeView;
-        this.indexDescriptors = indexDescriptors;
+        this.schemaRules = schemaRules;
         this.samplingController = samplingController;
         this.tokenNameLookup = tokenNameLookup;
         this.schemaState = schemaState;
@@ -213,8 +226,19 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         indexMapRef.modify( indexMap ->
         {
             Map<InternalIndexState, List<IndexLogRecord>> indexStates = new EnumMap<>( InternalIndexState.class );
-            for ( StoreIndexDescriptor indexDescriptor : indexDescriptors )
+            for ( SchemaRule rule : schemaRules )
             {
+                if ( rule instanceof ConstraintRule )
+                {
+                    ConstraintRule constraintRule = (ConstraintRule) rule;
+                    if ( constraintRule.getConstraintDescriptor().enforcesUniqueness() )
+                    {
+                        indexMap.putUniquenessConstraint( constraintRule );
+                    }
+                    continue;
+                }
+
+                StoreIndexDescriptor indexDescriptor = (StoreIndexDescriptor) rule;
                 IndexProxy indexProxy;
 
                 IndexProviderDescriptor providerDescriptor = indexDescriptor.providerDescriptor();
@@ -420,8 +444,11 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
             case ONLINE:
                 return;
             case FAILED:
-                throw new IllegalStateException(
-                        "Index entered " + FAILED + " state while recovery waited for it to be fully populated" );
+                IndexPopulationFailure populationFailure = proxy.getPopulationFailure();
+                String message =
+                        String.format( "Index %s entered %s state while recovery waited for it to be fully populated.", proxy.getDescriptor(), FAILED );
+                String causeOfFailure = populationFailure.asString();
+                throw new IllegalStateException( IndexPopulationFailure.appendCauseOfFailure( message, causeOfFailure ) );
             case POPULATING:
                 // Sleep a short while and look at state again the next loop iteration
                 try
@@ -482,6 +509,13 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
     }
 
     @Override
+    public IndexDescriptor getBlessedDescriptorFromProvider( IndexDescriptor index ) throws MisconfiguredIndexException
+    {
+        IndexProvider provider = providerMap.lookup( index.providerDescriptor() );
+        return provider.bless( index );
+    }
+
+    @Override
     public IndexProviderDescriptor indexProviderByName( String providerName )
     {
         return providerMap.lookup( providerName ).getProviderDescriptor();
@@ -539,6 +573,7 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
                                                 entityUpdates.entityTokensChanged(),
                                                 entityUpdates.entityTokensUnchanged(),
                                                 entityUpdates.propertiesChanged(),
+                                                entityUpdates.isPropertyListComplete(),
                                                 type );
 
         return entityUpdates.forIndexKeys( relatedIndexes, storeView, type );
@@ -607,6 +642,27 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         } );
     }
 
+    public void putConstraint( ConstraintRule rule )
+    {
+        indexMapRef.modify( indexMap ->
+        {
+            if ( rule.getConstraintDescriptor().enforcesUniqueness() )
+            {
+                indexMap.putUniquenessConstraint( rule );
+            }
+            return indexMap;
+        } );
+    }
+
+    public void removeConstraint( long ruleId )
+    {
+        indexMapRef.modify( indexMap ->
+        {
+            indexMap.removeUniquenessConstraint( ruleId );
+            return indexMap;
+        } );
+    }
+
     public void triggerIndexSampling( IndexSamplingMode mode )
     {
         internalLog.info( "Manual trigger for sampling all indexes [" + mode + "]" );
@@ -639,7 +695,7 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
             if ( state == State.RUNNING ) // don't do this during recovery.
             {
                 IndexProxy index = getIndexProxy( indexId );
-                index.awaitStoreScanCompleted();
+                index.awaitStoreScanCompleted( 0, TimeUnit.MILLISECONDS );
                 index.activate();
                 internalLog.info( "Constraint %s is %s.", index.getDescriptor(), ONLINE.name() );
             }
@@ -811,6 +867,36 @@ public class IndexingService extends LifecycleAdapter implements IndexingUpdateS
         {
             userLog.info( joiner.toString() );
         }
+    }
+
+    public Collection<SchemaDescriptor> getRelatedIndexes( long[] labels, int propertyKeyId, EntityType entityType )
+    {
+        return indexMapRef.getRelatedIndexes( PrimitiveLongCollections.EMPTY_LONG_ARRAY, labels, new int[]{propertyKeyId}, false, entityType );
+    }
+
+    public Collection<SchemaDescriptor> getRelatedIndexes( long[] labels, int[] propertyKeyIds, EntityType entityType )
+    {
+        return indexMapRef.getRelatedIndexes( labels, PrimitiveLongCollections.EMPTY_LONG_ARRAY, propertyKeyIds, true, entityType );
+    }
+
+    public Collection<IndexBackedConstraintDescriptor> getRelatedUniquenessConstraints( long[] labels, int propertyKeyId, EntityType entityType )
+    {
+        return indexMapRef.getRelatedConstraints( PrimitiveLongCollections.EMPTY_LONG_ARRAY, labels, new int[] {propertyKeyId}, false, entityType );
+    }
+
+    public Collection<IndexBackedConstraintDescriptor> getRelatedUniquenessConstraints( long[] labels, int[] propertyKeyIds, EntityType entityType )
+    {
+        return indexMapRef.getRelatedConstraints( labels, PrimitiveLongCollections.EMPTY_LONG_ARRAY, propertyKeyIds, true, entityType );
+    }
+
+    public boolean hasRelatedSchema( long[] labels, int propertyKey, EntityType entityType )
+    {
+        return indexMapRef.hasRelatedSchema( labels, propertyKey, entityType );
+    }
+
+    public boolean hasRelatedSchema( int label, EntityType entityType )
+    {
+        return indexMapRef.hasRelatedSchema( label, entityType );
     }
 
     private final class IndexPopulationStarter implements Function<IndexMap,IndexMap>

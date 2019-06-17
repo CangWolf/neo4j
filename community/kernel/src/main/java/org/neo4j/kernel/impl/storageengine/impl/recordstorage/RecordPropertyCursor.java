@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -141,7 +141,7 @@ class RecordPropertyCursor extends PropertyRecord implements StoragePropertyCurs
     }
 
     @Override
-    public void close()
+    public void reset()
     {
         if ( open )
         {
@@ -351,7 +351,7 @@ class RecordPropertyCursor extends PropertyRecord implements StoragePropertyCurs
     }
 
     @Override
-    public void release()
+    public void close()
     {
         if ( stringPage != null )
         {

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -23,7 +23,7 @@ sealed trait PathStep extends Product with Foldable with Rewritable {
 
   self =>
 
-  def dependencies: Set[Expression]
+  def dependencies: Set[LogicalVariable]
 
   def dup(children: Seq[AnyRef]): this.type =
     if (children.iterator eqElements this.children)
@@ -38,20 +38,20 @@ sealed trait PathStep extends Product with Foldable with Rewritable {
     }
 }
 
-final case class NodePathStep(node: Expression, next: PathStep) extends PathStep {
+final case class NodePathStep(node: LogicalVariable, next: PathStep) extends PathStep {
   val dependencies = next.dependencies + node
 }
 
-final case class SingleRelationshipPathStep(rel: Expression, direction: SemanticDirection, next: PathStep) extends PathStep {
+final case class SingleRelationshipPathStep(rel: LogicalVariable, direction: SemanticDirection, next: PathStep) extends PathStep {
   val dependencies = next.dependencies + rel
 }
 
-final case class MultiRelationshipPathStep(rel: Expression, direction: SemanticDirection, next: PathStep) extends PathStep {
+final case class MultiRelationshipPathStep(rel: LogicalVariable, direction: SemanticDirection, next: PathStep) extends PathStep {
   val dependencies = next.dependencies + rel
 }
 
 case object NilPathStep extends PathStep {
-  def dependencies = Set.empty[Expression]
+  def dependencies = Set.empty[LogicalVariable]
 }
 
 case class PathExpression(step: PathStep)(val position: InputPosition) extends Expression

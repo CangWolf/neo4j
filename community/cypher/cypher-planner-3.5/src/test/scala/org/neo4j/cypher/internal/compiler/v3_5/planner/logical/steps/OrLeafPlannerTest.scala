@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -24,15 +24,15 @@ import org.mockito.ArgumentMatchers._
 import org.mockito.Mockito._
 import org.neo4j.cypher.internal.compiler.v3_5.planner.LogicalPlanningTestSupport
 import org.neo4j.cypher.internal.compiler.v3_5.planner.logical.{LeafPlanFromExpressions, LeafPlansForVariable}
-import org.neo4j.cypher.internal.ir.v3_5.{QueryGraph, InterestingOrder, Selections}
-import org.neo4j.cypher.internal.v3_5.logical.plans.{Distinct, Union}
+import org.neo4j.cypher.internal.ir.v3_5.{InterestingOrder, QueryGraph, Selections}
 import org.neo4j.cypher.internal.v3_5.expressions.{Ors, Variable}
+import org.neo4j.cypher.internal.v3_5.logical.plans.{Distinct, Union}
 import org.neo4j.cypher.internal.v3_5.util.test_helpers.CypherFunSuite
 
 class OrLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSupport {
 
   test("two predicates on the same variable can be used") {
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext())
 
     val inner1 = mock[LeafPlanFromExpressions]
     val p1 = newMockedLogicalPlan(context.planningAttributes, "x")
@@ -55,7 +55,7 @@ class OrLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSupport {
   }
 
   test("two predicates on different variables are not used") {
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext())
 
     val inner1 = mock[LeafPlanFromExpressions]
     val p1 = newMockedLogicalPlan(context.planningAttributes, "x")
@@ -73,7 +73,7 @@ class OrLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSupport {
   }
 
   test("two predicates, where one cannot be leaf-plan-solved, is not used") {
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext())
 
     val inner1 = mock[LeafPlanFromExpressions]
     val p1 = newMockedLogicalPlan(context.planningAttributes, "x")
@@ -90,7 +90,7 @@ class OrLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSupport {
   }
 
   test("two predicates that produce two plans each") {
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext())
 
     val inner1 = mock[LeafPlanFromExpressions]
     val inner2 = mock[LeafPlanFromExpressions]
@@ -128,7 +128,7 @@ class OrLeafPlannerTest extends CypherFunSuite with LogicalPlanningTestSupport {
   }
 
   test("two predicates that produce two plans each mk 2") {
-    val context = newMockedLogicalPlanningContext(newMockedPlanContext)
+    val context = newMockedLogicalPlanningContext(newMockedPlanContext())
 
     val inner1 = mock[LeafPlanFromExpressions]
     val inner2 = mock[LeafPlanFromExpressions]

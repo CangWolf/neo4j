@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -36,7 +36,6 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.EnumMap;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -54,7 +53,6 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import org.neo4j.graphdb.Entity;
-import org.neo4j.graphdb.ExecutionPlanDescription;
 import org.neo4j.graphdb.GraphDatabaseService;
 import org.neo4j.graphdb.Label;
 import org.neo4j.graphdb.Node;
@@ -96,12 +94,14 @@ import static org.junit.Assert.assertThat;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.neo4j.graphdb.DependencyResolver.SelectionStrategy.ONLY;
+import static org.neo4j.helpers.collection.Iterables.single;
 
 public class FulltextProceduresTest
 {
     private static final String DB_INDEXES = "CALL db.indexes";
     private static final String DROP = "CALL db.index.fulltext.drop(\"%s\")";
     private static final String LIST_AVAILABLE_ANALYZERS = "CALL db.index.fulltext.listAvailableAnalyzers()";
+    private static final String DB_AWAIT_INDEX = "CALL db.index.fulltext.awaitIndex(\"%s\")";
     static final String QUERY_NODES = "CALL db.index.fulltext.queryNodes(\"%s\", \"%s\")";
     static final String QUERY_RELS = "CALL db.index.fulltext.queryRelationships(\"%s\", \"%s\")";
     static final String AWAIT_REFRESH = "CALL db.index.fulltext.awaitEventuallyConsistentIndexRefresh()";
@@ -162,6 +162,7 @@ public class FulltextProceduresTest
             assertEquals( asList( "Label1", "Label2" ), row.get( "tokenNames" ) );
             assertEquals( asList( "prop1", "prop2" ), row.get( "properties" ) );
             assertEquals( "test-index", row.get( "indexName" ) );
+            assertEquals( "node_fulltext", row.get( "type" ) );
             assertFalse( result.hasNext() );
             result.close();
             awaitIndexesOnline();
@@ -183,6 +184,7 @@ public class FulltextProceduresTest
             assertEquals( "INDEX ON NODE:Label1, Label2(prop1, prop2)", row.get( "description" ) );
             assertEquals( "ONLINE", row.get( "state" ) );
             assertFalse( result.hasNext() );
+            //noinspection ConstantConditions
             assertFalse( result.hasNext() );
             assertNotNull( db.schema().getIndexByName( "test-index" ) );
             tx.success();
@@ -205,6 +207,7 @@ public class FulltextProceduresTest
             assertEquals( asList( "Reltype1", "Reltype2" ), row.get( "tokenNames" ) );
             assertEquals( asList( "prop1", "prop2" ), row.get( "properties" ) );
             assertEquals( "test-index", row.get( "indexName" ) );
+            assertEquals( "relationship_fulltext", row.get( "type" ) );
             assertFalse( result.hasNext() );
             result.close();
             awaitIndexesOnline();
@@ -226,6 +229,7 @@ public class FulltextProceduresTest
             assertEquals( "INDEX ON RELATIONSHIP:Reltype1, Reltype2(prop1, prop2)", row.get( "description" ) );
             assertEquals( "ONLINE", row.get( "state" ) );
             assertFalse( result.hasNext() );
+            //noinspection ConstantConditions
             assertFalse( result.hasNext() );
             assertNotNull( db.schema().getIndexByName( "test-index" ) );
             tx.success();
@@ -699,6 +703,7 @@ public class FulltextProceduresTest
     {
         db = createDatabase();
 
+        // Verify that a couple of expected analyzers are available.
         try ( Transaction tx = db.beginTx() )
         {
             Set<String> analyzers = new HashSet<>();
@@ -712,6 +717,24 @@ public class FulltextProceduresTest
             assertThat( analyzers, hasItem( "english" ) );
             assertThat( analyzers, hasItem( "swedish" ) );
             assertThat( analyzers, hasItem( "standard" ) );
+            tx.success();
+        }
+
+        // Verify that all analyzers have a description.
+        try ( Transaction tx = db.beginTx() )
+        {
+            try ( Result result = db.execute( LIST_AVAILABLE_ANALYZERS ) )
+            {
+                while ( result.hasNext() )
+                {
+                    Map<String,Object> row = result.next();
+                    Object description = row.get( "description" );
+                    if ( !row.containsKey( "description" ) || !(description instanceof String) || ((String) description).trim().isEmpty() )
+                    {
+                        fail( "Found no description for analyzer: " + row );
+                    }
+                }
+            }
             tx.success();
         }
     }
@@ -2056,6 +2079,278 @@ public class FulltextProceduresTest
         try ( Result result = db.execute( "cypher 3.4 profile match (n:" + LABEL.name() + ") where n." + PROP + " = {prop} return n", params ) )
         {
             assertNoIndexSeeks( result );
+        }
+    }
+
+    @Test
+    public void awaitIndexProcedureMustWorkOnIndexNames()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            for ( int i = 0; i < 1000; i++ )
+            {
+                Node node = db.createNode( LABEL );
+                node.setProperty( PROP, "value" );
+                Relationship rel = node.createRelationshipTo( node, REL );
+                rel.setProperty( PROP, "value" );
+            }
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            createSimpleNodesIndex();
+            createSimpleRelationshipIndex();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( format( DB_AWAIT_INDEX, "nodes" ) ).close();
+            db.execute( format( DB_AWAIT_INDEX, "rels" ) ).close();
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustBePossibleToDropFulltextIndexByNameForWhichNormalIndexExistWithMatchingSchema()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( "CREATE INDEX ON :Person(name)" ).close();
+            db.execute( "call db.index.fulltext.createNodeIndex('nameIndex', ['Person'], ['name'])" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.schema().awaitIndexesOnline( 1, TimeUnit.MINUTES );
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            // This must not throw:
+            db.execute( "call db.index.fulltext.drop('nameIndex')" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            assertThat( single( db.schema().getIndexes() ).getName(), is( not( "nameIndex" ) ) );
+            tx.success();
+        }
+    }
+
+    @Test
+    public void fulltextIndexesMustNotPreventNormalSchemaIndexesFromBeingDropped()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( "CREATE INDEX ON :Person(name)" ).close();
+            db.execute( "call db.index.fulltext.createNodeIndex('nameIndex', ['Person'], ['name'])" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.schema().awaitIndexesOnline( 1, TimeUnit.MINUTES );
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            // This must not throw:
+            db.execute( "DROP INDEX ON :Person(name)" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            assertThat( single( db.schema().getIndexes() ).getName(), is( "nameIndex" ) );
+            tx.success();
+        }
+    }
+
+    @Test
+    public void creatingNormalIndexWithFulltextProviderMustThrow()
+    {
+        db = createDatabase();
+        assertThat( FulltextIndexProviderFactory.DESCRIPTOR.name(), is( "fulltext-1.0" ) ); // Sanity check that this test is up to date.
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( "call db.createIndex( \":User(searchableString)\", \"" + FulltextIndexProviderFactory.DESCRIPTOR.name() + "\" );" ).close();
+            tx.success();
+        }
+        catch ( QueryExecutionException e )
+        {
+            assertThat( e.getMessage(), containsString( "only supports fulltext index descriptors" ) );
+        }
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            long indexCount = db.execute( DB_INDEXES ).stream().count();
+            assertThat( indexCount, is( 0L ) );
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustSupportWildcardEndsLikeStartsWith()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            createSimpleNodesIndex();
+            tx.success();
+        }
+        LongHashSet ids = new LongHashSet();
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "abcdef" );
+            ids.add( node.getId() );
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "abcxyz" );
+            ids.add( node.getId() );
+
+            assertQueryFindsIds( db, true, "nodes", "abc*", ids );
+
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustSupportWildcardBeginningsLikeEndsWith()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            createSimpleNodesIndex();
+            tx.success();
+        }
+        LongHashSet ids = new LongHashSet();
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "defabc" );
+            ids.add( node.getId() );
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "xyzabc" );
+            ids.add( node.getId() );
+
+            assertQueryFindsIds( db, true, "nodes", "*abc", ids );
+
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustSupportWildcardBeginningsAndEndsLikeContains()
+    {
+        db = createDatabase();
+        try ( Transaction tx = db.beginTx() )
+        {
+            createSimpleNodesIndex();
+            tx.success();
+        }
+        LongHashSet ids = new LongHashSet();
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "defabcdef" );
+            ids.add( node.getId() );
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            Node node = db.createNode( LABEL );
+            node.setProperty( PROP, "xyzabcxyz" );
+            ids.add( node.getId() );
+
+            assertQueryFindsIds( db, true, "nodes", "*abc*", ids );
+
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustMatchCaseInsensitiveWithStandardAnalyzer()
+    {
+        db = createDatabase();
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'A'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'B'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'C'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'b'}))" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( format( NODE_CREATE, "myindex", array( "Label" ), array( "id" ) ) ).close();
+            tx.success();
+        }
+        awaitIndexesOnline();
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "A" ) ) )
+            {
+                assertThat( result.stream().count(), is( 0L ) ); // The letter 'A' is a stop-word in English, so it is not indexed.
+            }
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "B" ) ) )
+            {
+                assertThat( result.stream().count(), is( 2000L ) ); // Both upper- and lower-case 'B' nodes.
+            }
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "C" ) ) )
+            {
+                assertThat( result.stream().count(), is( 1000L ) ); // We only have upper-case 'C' nodes.
+            }
+            tx.success();
+        }
+    }
+
+    @Test
+    public void mustMatchCaseInsensitiveWithSimpleAnalyzer()
+    {
+        db = createDatabase();
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'A'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'B'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'C'}))" ).close();
+            db.execute( "foreach (x in range (1,1000) | create (n:Label {id:'b'}))" ).close();
+            tx.success();
+        }
+        try ( Transaction tx = db.beginTx() )
+        {
+            db.execute( format( NODE_CREATE, "myindex", array( "Label" ), array( "id" ) + ", {analyzer: 'simple'}" ) ).close();
+            tx.success();
+        }
+        awaitIndexesOnline();
+
+        try ( Transaction tx = db.beginTx() )
+        {
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "A" ) ) )
+            {
+                assertThat( result.stream().count(), is( 1000L ) ); // We only have upper-case 'A' nodes.
+            }
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "B" ) ) )
+            {
+                assertThat( result.stream().count(), is( 2000L ) ); // Both upper- and lower-case 'B' nodes.
+            }
+            try ( Result result = db.execute( format( QUERY_NODES, "myindex", "C" ) ) )
+            {
+                assertThat( result.stream().count(), is( 1000L ) ); // We only have upper-case 'C' nodes.
+            }
+            tx.success();
         }
     }
 

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -21,6 +21,8 @@ import scala.collection.generic.CanBuildFrom
 import scala.collection.mutable
 
 object NonEmptyList {
+
+  def unapplySeq[T](input: NonEmptyList[T]): Option[Seq[T]] = Some(input.toIndexedSeq)
 
   def from[T](input: Iterable[T]): NonEmptyList[T] =
     from(input.iterator)

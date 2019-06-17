@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -50,7 +50,7 @@ import static org.neo4j.bolt.testing.NullResponseHandler.nullResponseHandler;
 public class MachineRoom
 {
     static final MapValue EMPTY_PARAMS = VirtualValues.EMPTY_MAP;
-    static final String USER_AGENT = "BoltStateMachineTest/0.0";
+    static final String USER_AGENT = "BoltStateMachineV1Test/0.0";
 
     private MachineRoom()
     {

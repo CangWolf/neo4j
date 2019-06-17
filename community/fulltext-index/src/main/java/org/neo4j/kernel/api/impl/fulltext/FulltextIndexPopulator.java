@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -24,21 +24,21 @@ import org.apache.lucene.document.Document;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.Map;
 
 import org.neo4j.function.ThrowingAction;
 import org.neo4j.kernel.api.impl.index.DatabaseIndex;
 import org.neo4j.kernel.api.impl.schema.populator.LuceneIndexPopulator;
 import org.neo4j.kernel.api.index.IndexEntryUpdate;
 import org.neo4j.kernel.api.index.IndexUpdater;
-import org.neo4j.kernel.api.index.NodePropertyAccessor;
-import org.neo4j.logging.Log;
-import org.neo4j.logging.NullLog;
+import org.neo4j.storageengine.api.NodePropertyAccessor;
 import org.neo4j.storageengine.api.schema.IndexSample;
+import org.neo4j.values.storable.Value;
+import org.neo4j.values.storable.Values;
 
 public class FulltextIndexPopulator extends LuceneIndexPopulator<DatabaseIndex<FulltextIndexReader>>
 {
-    static Log TRACE_LOG = NullLog.getInstance();
-
     private final FulltextIndexDescriptor descriptor;
     private final ThrowingAction<IOException> descriptorCreateAction;
 
@@ -71,7 +71,6 @@ public class FulltextIndexPopulator extends LuceneIndexPopulator<DatabaseIndex<F
         {
             for ( IndexEntryUpdate<?> update : updates )
             {
-                TRACE_LOG.debug( "populator add: %s", update );
                 writer.updateDocument( LuceneFulltextDocumentStructure.newTermForChangeOrRemove( update.getEntityId() ), updateAsDocument( update ) );
             }
         }
@@ -105,6 +104,15 @@ public class FulltextIndexPopulator extends LuceneIndexPopulator<DatabaseIndex<F
         return new IndexSample();
     }
 
+    @Override
+    public Map<String,Value> indexConfig()
+    {
+        Map<String,Value> map = new HashMap<>();
+        map.put( FulltextIndexSettings.INDEX_CONFIG_ANALYZER, Values.stringValue( descriptor.analyzerName() ) );
+        map.put( FulltextIndexSettings.INDEX_CONFIG_EVENTUALLY_CONSISTENT, Values.booleanValue( descriptor.isEventuallyConsistent() ) );
+        return map;
+    }
+
     private Document updateAsDocument( IndexEntryUpdate<?> update )
     {
         return LuceneFulltextDocumentStructure.documentRepresentingProperties( update.getEntityId(), descriptor.propertyNames(), update.values() );
@@ -115,7 +123,6 @@ public class FulltextIndexPopulator extends LuceneIndexPopulator<DatabaseIndex<F
         @Override
         public void process( IndexEntryUpdate<?> update )
         {
-            TRACE_LOG.debug( "populating updater process: %s", update );
             assert update.indexKey().schema().equals( descriptor.schema() );
             try
             {

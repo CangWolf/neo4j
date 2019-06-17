@@ -1,5 +1,5 @@
-package org.neo4j.test.rule;/*
- * Copyright (c) 2002-2018 "Neo4j,"
+/*
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -17,6 +17,7 @@ package org.neo4j.test.rule;/*
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.neo4j.test.rule;
 
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
@@ -94,7 +95,6 @@ public class RandomRule implements TestRule
                 {
                     setSeed( globalSeed );
                 }
-                reset();
                 try
                 {
                     base.evaluate();
@@ -315,6 +315,7 @@ public class RandomRule implements TestRule
     public void setSeed( long seed )
     {
         this.seed = seed;
+        reset();
     }
 
     @Retention( RetentionPolicy.RUNTIME )

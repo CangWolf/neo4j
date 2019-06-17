@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2002-2018 "Neo4j,"
+ * Copyright (c) 2002-2019 "Neo4j,"
  * Neo4j Sweden AB [http://neo4j.com]
  *
  * This file is part of Neo4j.
@@ -42,6 +42,7 @@ import org.neo4j.test.rule.fs.EphemeralFileSystemRule;
 
 import static org.hamcrest.CoreMatchers.is;
 import static org.junit.Assert.assertThat;
+import static org.junit.Assert.fail;
 import static org.neo4j.graphdb.factory.GraphDatabaseSettings.logical_logs_location;
 
 public class RecoveryRequiredCheckerTest
@@ -77,6 +78,13 @@ public class RecoveryRequiredCheckerTest
     }
 
     @Test
+    public void shouldNotThrowIfIntactStore() throws RecoveryRequiredException, IOException
+    {
+        PageCache pageCache = pageCacheRule.getPageCache( fileSystem );
+        RecoveryRequiredChecker.assertRecoveryIsNotRequired( fileSystem, pageCache, Config.defaults(), databaseLayout, new Monitors() );
+    }
+
+    @Test
     public void shouldWantToRecoverBrokenStore() throws Exception
     {
         try ( FileSystemAbstraction fileSystemAbstraction = createAndCrashWithDefaultConfig() )
@@ -86,6 +94,17 @@ public class RecoveryRequiredCheckerTest
             RecoveryRequiredChecker recoverer = getRecoveryCheckerWithDefaultConfig( fileSystemAbstraction, pageCache );
 
             assertThat( recoverer.isRecoveryRequiredAt( databaseLayout ), is( true ) );
+        }
+    }
+
+    @Test( expected = RecoveryRequiredException.class )
+    public void shouldThrowIfBrokenStore() throws IOException, RecoveryRequiredException
+    {
+        try ( FileSystemAbstraction fileSystemAbstraction = createAndCrashWithDefaultConfig() )
+        {
+            PageCache pageCache = pageCacheRule.getPageCache( fileSystemAbstraction );
+            RecoveryRequiredChecker.assertRecoveryIsNotRequired( fileSystemAbstraction, pageCache, Config.defaults(), databaseLayout, new Monitors() );
+            fail();
         }
     }
 
